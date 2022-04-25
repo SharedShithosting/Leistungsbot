@@ -35,7 +35,7 @@ CHAT_ID = '-666753063'# YOUR PRIVATE GROUP TO VIEW LOGS OR ERROR
 USERNAMES = ['eckphi'] # YOUR USERNAME THIS IS MANDTORY
 
 ### ABOVE MAIN VARS -------------------------------------------------------------------|
-bot = telebot.TeleBot(token=BOT_TOKEN)
+bot = telebot.TeleBot(BOT_TOKEN)
 
 @bot.message_handler(commands=['showIds'])
 def showIds(message):
