@@ -1,3 +1,12 @@
+################################################################################################
+################################################################################################
+# "THE BEER-WARE LICENSE" (Revision 42):
+# @eckphi wrote this file. As long as you retain this notice you
+# can do whatever you want with this stuff. If we meet some day, and you think
+# this stuff is worth it, you can buy me a beer in return Poul-Henning Kamp
+################################################################################################
+################################################################################################
+
 import telebot
 import datetime
 import time
@@ -11,7 +20,7 @@ User Available Commands:
     4. /help
     5. /groups
    
-Developer Commands: #NOTE: ONLY @Parvat_R and @Rohithaditya are allowed for these comands:
+Developer Commands: #NOTE: ONLY @eckphi are allowed for these comands:
     1. /showIds
     2. /botlogs
 '''
@@ -19,11 +28,11 @@ Developer Commands: #NOTE: ONLY @Parvat_R and @Rohithaditya are allowed for thes
 '''
 THESE ARE THE IMPORTANT VARS FOR POLL BOT
 '''
-BOT_TOKEN = '8s858s85s:4g44g4646g464g4g448' # YOUR BOT TOKEN HERE GET FROM @BotFather
-API_HASH = '85df55s5s5s55s55a4' # YOUR API HASH GET FROM my.telegram.org
-API_ID = '1234567' # YOUR API ID GET FROM my.telegram.org
-CHAT_ID = '-1001'# YOUR PRIVATE GROUP TO VIEW LOGS OR ERROR
-USERNAME = 'Rohithaditya' # YOUR USERNAME THIS IS MANDTORY
+BOT_TOKEN = '5277349785:AAGbCz4ozwI0l5CnkqHv2ZKhDdGi0s7Rnw0' # YOUR BOT TOKEN HERE GET FROM @BotFather
+API_HASH = '60f71bfe3b2f6e386597050b61ae03d7' # YOUR API HASH GET FROM my.telegram.org
+API_ID = '13242285' # YOUR API ID GET FROM my.telegram.org
+CHAT_ID = '-666753063'# YOUR PRIVATE GROUP TO VIEW LOGS OR ERROR
+USERNAMES = ['eckphi'] # YOUR USERNAME THIS IS MANDTORY
 
 ### ABOVE MAIN VARS -------------------------------------------------------------------|
 bot = telebot.TeleBot(token=BOT_TOKEN)
@@ -31,7 +40,7 @@ bot = telebot.TeleBot(token=BOT_TOKEN)
 @bot.message_handler(commands=['showIds'])
 def showIds(message):
     try:
-        if message.from_user.username in ['Parvat_R', 'Rohithaditya', USERNAME]:
+        if message.from_user.username in USERNAMES:
             file = open('joined_groups.txt', 'r ')
             bot.send_document(message.chat.id, file)
             file.close()
@@ -42,7 +51,7 @@ def showIds(message):
 @bot.message_handler(commands=['stats', 'groups'])
 def stats(message):
     try:
-        if message.from_user.username in['Parvat_R','Rohithaditya', USERNAME]:
+        if message.from_user.username in USERNAMES:
             print('Sending Stats To Owner')
             with open('joined_groups.txt', 'r') as file:
                 group_ids = []
@@ -52,7 +61,7 @@ def stats(message):
                         no_of_polls = len(group_ids)
                         no_of_groups = len(list(set(group_ids)))
                 group_ids.clear()
-                bot.reply_to(message, f'Number of polls Maded: {no_of_polls}\nNo of groups bot has been added: {no_of_groups}')
+                bot.reply_to(message, f'Number of polls Made: {no_of_polls}\n#Nr of groups bot has been added to: {no_of_groups}')
                 file.close()
         else:
                         bot.reply_to(message, f'Sorry {message.from_user.username}! You Are Not Allowed To Use This Command,')
@@ -69,7 +78,7 @@ def stats(message):
 @bot.message_handler(commands=['botlogs'])
 def ViewTheLogsFile(message):
     try:
-        if message.from_user.username in ['Parvat_R', 'Rohithaditya', USERNAME]:
+        if message.from_user.username in USERNAMES:
             print('Owner Asked For The Logs!')
             file = open('POLL_LOGS.txt', 'r')
             bot.send_document(message.chat.id, file, timeout=60, disable_notification=True)
@@ -95,7 +104,7 @@ def poller(message):
 Username: {message.from_user.username}
 User Id : {message.from_user.id}
 Command : {message.text}
-OWNER : {USERNAME}
+OWNER : {USERNAMES[0]}
 Chat Id : {message.chat.id}
 ChatType: {message.chat.type}
 GroupUserName: {message.chat.username}
@@ -181,7 +190,6 @@ But What You Sent Me was🤣🤣😂😂😁
 
 Which is invalid.
 For more help use: /help
-or contact us at: @venilabots1
 ''')
     except Exception as error:
         bot.send_message(CHAT_ID,f'''Error From Poll Bot!
@@ -210,7 +218,7 @@ The Complete Detail:
         
         return bot.reply_to(message, f'''An Unexpected Error Occured!
 Error::  {error}
-The error was informed to @venilabots''')
+The error was informed to @eckphi''')
         
         
 
@@ -220,7 +228,7 @@ def pollNow(message):
 
 @bot.message_handler(commands=['help'])
 def helper(message):
-    return bot.reply_to(message, f'''My Name Defines Who Am I. 
+    return bot.reply_to(message, f'''My Name Defines Who I Am. 
     What Can I Do?
     1. Create polls
     2. Unlimited Polls
@@ -284,16 +292,8 @@ Note:
     -Every part is split by '|'.
     -To use ',' in option use: '<.>'
 
-For more informations visit:
-Official Site:
-https://sprin-g-reen.github.io/
-Telegram:
-@venilabots
-@venilabots1
-
 Devs:
-@Parvat_R
-@Rohithaditya
+@eckphi
 
 Created with:
 python,
@@ -318,7 +318,7 @@ while True:
 '''
 @bot.message_handler(commands=['start'])
 def alive(message):
-    bot.reply_to(message, f'Heya {message.from_user.username}, I am there to help you in polls. But this cmd is bit old try /help. SEE @VENILABOTS FOR MORE BOTS LIKE THIS')
+    bot.reply_to(message, f'Heya {message.from_user.username}, I am there to help you in polls. But this cmd is bit old try /help.')
 
 err_count = 0 #Check for errors
 while True:
@@ -330,6 +330,3 @@ while True:
         print(f'Error Number: {err_count}')
         if err_count == 10:
             break
-"""
-PLEASE KEEP CREDITS
-"""
