@@ -136,6 +136,7 @@ For more help use: /help
 
     def send_nude(self, msg):
         gif = 'https://cdn.porngifs.com/img/%s' % (random.randint(1, 39239))
+        bot.reply_to(msg, 'Wennst meinst...Auf eigene Verantwortung!')
         bot.send_animation(msg.chat.id, gif)
 
 
