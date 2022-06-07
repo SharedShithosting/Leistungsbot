@@ -127,7 +127,7 @@ For more help use: /help
     def new_msg(self, msg):
         if self.recent_command == 'leistungspoll':
             self.poller(msg)
-        elif 'nude' in msg.text:
+        elif 'nude' in msg.text.lower():
             self.send_nude(msg)
 
     def sender_has_permission(self, msg):
@@ -135,8 +135,7 @@ For more help use: /help
         return sender.status == 'administrator' or sender.status == 'creator'
 
     def send_nude(self, msg):
-        gif = requests.get('https://cdn.porngifs.com/img/%s' %
-                           (random.randint(1, 39239)))
+        gif = 'https://cdn.porngifs.com/img/%s' % (random.randint(1, 39239))
         bot.send_animation(msg.chat.id, gif)
 
 
