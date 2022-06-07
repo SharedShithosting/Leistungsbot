@@ -137,7 +137,7 @@ For more help use: /help
     def send_nude(self, msg):
         gif = requests.get('https://cdn.porngifs.com/img/%s' %
                            (random.randint(1, 39239)))
-        bot.send_animation(msg.chat_id, gif)
+        bot.send_animation(msg.chat.id, gif)
 
 
 cmd = Commands(bot)
@@ -275,19 +275,6 @@ def alive(message):
         message, f'Hey {message.from_user.username}, Ready To Serve You')
 
 
-'''err_count = 0 #Check for errors
-while True:
-    try:
-        bot.polling()
-    except FileNotFoundError as e:
-        print(e)
-        err_count +=1
-        print(f'Error Number: {err_count}')
-        if err_count == 10:
-            break
-'''
-
-
 @bot.message_handler(commands=['start'])
 def start(message):
     bot.reply_to(
@@ -296,12 +283,26 @@ def start(message):
 
 @bot.message_handler(content_types=['text'])
 def new_msg(message):
-    cmd.new_msg(message)
+    try:
+        cmd.new_msg(message)
+    except Exception as error:
+        bot.send_message(
+            CHAT_ID, f'Hi Devs!!\nHandle This Error plox\n{error}')
+        bot.reply_to(message, f'An error occurred!\nError: {error}')
+        bot.send_message(CHAT_ID, f'An error occurred!\nError: {error}')
+        bot.send_document(CHAT_ID, '{message}')
 
 
 @bot.message_handler(commands=['sendnudes'])
 def send_nudes(message):
-    cmd.new_msg(message)
+    try:
+        cmd.new_msg(message)
+    except Exception as error:
+        bot.send_message(
+            CHAT_ID, f'Hi Devs!!\nHandle This Error plox\n{error}')
+        bot.reply_to(message, f'An error occurred!\nError: {error}')
+        bot.send_message(CHAT_ID, f'An error occurred!\nError: {error}')
+        bot.send_document(CHAT_ID, '{message}')
 
 
 class GracefulKiller:
