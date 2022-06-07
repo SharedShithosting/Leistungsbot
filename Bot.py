@@ -12,7 +12,8 @@ import datetime
 import json
 import os
 import socket
-
+import random
+import requests
 
 # HELP TEXT ------------------------------------------------------------------------|
 '''
@@ -126,10 +127,17 @@ For more help use: /help
     def new_msg(self, msg):
         if self.recent_command == 'leistungspoll':
             self.poller(msg)
+        elif 'nude' in msg.text:
+            self.send_nude(msg)
 
     def sender_has_permission(self, msg):
         sender = bot.get_chat_member(LEISTUNGSCHAT_ID, msg.from_user.id)
         return sender.status == 'administrator' or sender.status == 'creator'
+
+    def send_nude(self, msg):
+        gif = requests.get('https://cdn.porngifs.com/img/%s' %
+                           (random.randint(1, 39239)))
+        bot.send_animation(msg.chat_id, gif)
 
 
 cmd = Commands(bot)
@@ -288,6 +296,11 @@ def start(message):
 
 @bot.message_handler(content_types=['text'])
 def new_msg(message):
+    cmd.new_msg(message)
+
+
+@bot.message_handler(commands=['sendnudes'])
+def send_nudes(message):
     cmd.new_msg(message)
 
 
