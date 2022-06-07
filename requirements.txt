@@ -5,3 +5,4 @@ requests==2.13.0
 six==1.10.0
 pyTelegramBotAPI
 mysql-connector-python==8.0.29
+urllib3

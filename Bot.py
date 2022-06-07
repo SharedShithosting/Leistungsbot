@@ -10,6 +10,9 @@
 import telebot
 import datetime
 import json
+import os
+import socket
+
 
 # HELP TEXT ------------------------------------------------------------------------|
 '''
@@ -125,7 +128,7 @@ For more help use: /help
             self.poller(msg)
 
     def sender_has_permission(self, msg):
-        sender = bot.get_chat_member(msg.chat.id, msg.from_user.id)
+        sender = bot.get_chat_member(LEISTUNGSCHAT_ID, msg.from_user.id)
         return sender.status == 'administrator' or sender.status == 'creator'
 
 
@@ -286,6 +289,99 @@ def start(message):
 @bot.message_handler(content_types=['text'])
 def new_msg(message):
     cmd.new_msg(message)
+
+
+class GracefulKiller:
+    kill_now = False
+
+    def __init__(self):
+        signal.signal(signal.SIGINT, self.exit_gracefully)
+        signal.signal(signal.SIGTERM, self.exit_gracefully)
+
+    def exit_gracefully(self, *args):
+        self.kill_now = True
+
+
+def watchdog_period():
+    """Return the time (in seconds) that we need to ping within."""
+    val = os.environ.get("WATCHDOG_USEC", None)
+    if not val:
+        logger.error("No watchdog period set in the unit file.")
+        return 1
+    return max([int(val)/1000000, 1])
+
+
+def notify_socket(clean_environment=True):
+    """Return a tuple of address, socket for future use.
+    clean_environment removes the variables from env to prevent children
+    from inheriting it and doing something wrong.
+    """
+    _empty = None, None
+    address = os.environ.get("NOTIFY_SOCKET", None)
+    if clean_environment:
+        address = os.environ.pop("NOTIFY_SOCKET", None)
+
+    if not address:
+        return _empty
+
+    if len(address) == 1:
+        return _empty
+
+    if address[0] not in ("@", "/"):
+        return _empty
+
+    if address[0] == "@":
+        address = "\0" + address[1:]
+
+    # SOCK_CLOEXEC was added in Python 3.2 and requires Linux >= 2.6.27.
+    # It means "close this socket after fork/exec()
+    try:
+        sock = socket.socket(socket.AF_UNIX,
+                             socket.SOCK_DGRAM | socket.SOCK_CLOEXEC)
+    except AttributeError:
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+
+    return address, sock
+
+
+def sd_message(address, sock, message):
+    """Send a message to the systemd bus/socket.
+    message is expected to be bytes.
+    """
+    if not (address and sock and message):
+        return False
+    assert isinstance(message, bytes)
+
+    try:
+        retval = sock.sendto(message, address)
+    except socket.error:
+        return False
+    return (retval > 0)
+
+
+def watchdog_ping(address, sock):
+    """Helper function to send a watchdog ping."""
+    message = b"WATCHDOG=1"
+    return sd_message(address, sock, message)
+
+
+def systemd_ready(address, sock):
+    """Helper function to send a ready signal."""
+    message = b"READY=1"
+    logger.debug("Signaling system ready")
+    return sd_message(address, sock, message)
+
+
+def systemd_stop(address, sock):
+    """Helper function to signal service stopping."""
+    message = b"STOPPING=1"
+    return sd_message(address, sock, message)
+
+
+def systemd_status(address, sock, status):
+    """Helper function to update the service status."""
+    message = ("STATUS=%s" % status).encode('utf8')
+    return sd_message(address, sock, message)
 
 
 err_count = 0  # Check for errors
