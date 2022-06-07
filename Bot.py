@@ -11,7 +11,7 @@ import telebot
 import datetime
 import json
 
-### HELP TEXT ------------------------------------------------------------------------|
+# HELP TEXT ------------------------------------------------------------------------|
 '''
 User Available Commands:
     1. /poll
@@ -24,27 +24,29 @@ Developer Commands: #NOTE: ONLY @eckphi are allowed for these comands:
     1. /showIds
     2. /botlogs
 '''
-### MAIN VARS ------------------------------------------------------------------------|
+# MAIN VARS ------------------------------------------------------------------------|
 '''
 THESE ARE THE IMPORTANT VARS FOR POLL BOT
 '''
-BOT_TOKEN = '5277349785:AAGbCz4ozwI0l5CnkqHv2ZKhDdGi0s7Rnw0' # YOUR BOT TOKEN HERE GET FROM @BotFather
-API_HASH = '60f71bfe3b2f6e386597050b61ae03d7' # YOUR API HASH GET FROM my.telegram.org
-API_ID = '13242285' # YOUR API ID GET FROM my.telegram.org
-CHAT_ID = '-666753063'# YOUR PRIVATE GROUP TO VIEW LOGS OR ERROR
-LEISTUNGSCHAT_ID = '-1001517264648'
-USERNAMES = ['eckphi'] # YOUR USERNAME THIS IS MANDTORY
+BOT_TOKEN = '5277349785:AAGbCz4ozwI0l5CnkqHv2ZKhDdGi0s7Rnw0'  # YOUR BOT TOKEN HERE GET FROM @BotFather
+# YOUR API HASH GET FROM my.telegram.org
+API_HASH = '60f71bfe3b2f6e386597050b61ae03d7'
+API_ID = '13242285'  # YOUR API ID GET FROM my.telegram.org
+CHAT_ID = '-666753063'  # YOUR PRIVATE GROUP TO VIEW LOGS OR ERROR
+LEISTUNGSCHAT_ID = '-1001503308928'  # '-1001517264648'
+USERNAMES = ['eckphi']  # YOUR USERNAME THIS IS MANDTORY
 
-### ABOVE MAIN VARS -------------------------------------------------------------------|
+# ABOVE MAIN VARS -------------------------------------------------------------------|
 bot = telebot.TeleBot(BOT_TOKEN)
 
-class Commands:
-  def __init__(self, bot):
-    self.bot = bot
-    self.recent_command = None
 
-  def excep(self, msg, error):
-    bot.send_message(CHAT_ID,f'''Error From Poll Bot!
+class Commands:
+    def __init__(self, bot):
+        self.bot = bot
+        self.recent_command = None
+
+    def excep(self, msg, error):
+        bot.send_message(CHAT_ID, f'''Error From Poll Bot!
 
 Error  :: {error}
 
@@ -67,61 +69,68 @@ The Complete Detail:
 
 
 ''')
-        
-    return self.bot.reply_to(self.message, f'''An Unexpected Error Occured!
+
+        return self.bot.reply_to(self.message, f'''An Unexpected Error Occured!
 Error::  {error}
 The error was informed to @eckphi''')
 
-  def leistungspoll(self, msg):
-    self.recent_command = 'leistungspoll'
-    bot.reply_to(msg, 'Schick de nexte location muaz')
-    
-  def poller(self, message):
-    try:
-        with open('ltcounter.txt', 'r') as cnt:
-          #The main function
-          ltcounter = int(cnt.readline()) + 1
-          ltdate = (datetime.datetime.now() +  datetime.timedelta(days=(8 - datetime.datetime.now().weekday()))).strftime('%d.%m.%Y')
-          location = message.text.strip()
-          question = f'Leistungstag {ltcounter}: am {ltdate} in "{location}"'
+    def leistungspoll(self, msg):
+        self.recent_command = 'leistungspoll'
+        bot.reply_to(msg, 'Schick de nexte location muaz')
 
-          if not location:
-              bot.reply_to(message, 'Bist deppad, wüst mi veroaschn? Leistungstog im nix oda wos?')
-              return False
-          
-          id = bot.send_poll(
-              LEISTUNGSCHAT_ID,
-              question,
-              ["Bin dabei", "Keine Zeit"],
-              allows_multiple_answers= False,
-              explanation            = "uiuiuiui" ,
-              open_period            = None ,
-              type='quiz',
-              correct_option_id=0, 
-              is_anonymous=False
-              )
-          with open('ltcounter.txt', 'w') as cnt:
-              cnt.write(str(ltcounter))
-          with open('recentpoll.txt', 'w') as of:
-              of.write(json.dumps({'chat_id': LEISTUNGSCHAT_ID, 'message_id':id.id}))
-    
-    except IndexError:
-        return bot.reply_to(message, f'''Lol!!! An error in the wild:
+    def poller(self, message):
+        try:
+            with open('ltcounter.txt', 'r') as cnt:
+                # The main function
+                ltcounter = int(cnt.readline()) + 1
+                ltdate = (datetime.datetime.now() + datetime.timedelta(days=(8 -
+                          datetime.datetime.now().weekday()))).strftime('%d.%m.%Y')
+                location = message.text.strip()
+                question = f'Leistungstag {ltcounter}: am {ltdate} in "{location}"'
+
+                if not location:
+                    bot.reply_to(
+                        message, 'Bist deppad, wüst mi veroaschn? Leistungstog im nix oda wos?')
+                    return False
+
+                id = bot.send_poll(
+                    LEISTUNGSCHAT_ID,
+                    question,
+                    ["Bin dabei", "Keine Zeit"],
+                    allows_multiple_answers=False,
+                    explanation="uiuiuiui",
+                    open_period=None,
+                    type='quiz',
+                    correct_option_id=0,
+                    is_anonymous=False
+                )
+                with open('ltcounter.txt', 'w') as cnt:
+                    cnt.write(str(ltcounter))
+                with open('recentpoll.txt', 'w') as of:
+                    of.write(json.dumps(
+                        {'chat_id': LEISTUNGSCHAT_ID, 'message_id': id.id}))
+
+        except IndexError:
+            return bot.reply_to(message, f'''Lol!!! An error in the wild:
 {message.text}
 
 Which is invalid.
 For more help use: /help
 ''')
-    except Exception as error:
-        self.excep(message, error)
+        except Exception as error:
+            self.excep(message, error)
 
-  def new_msg(self, msg):
-    if self.recent_command == 'leistungspoll':
-      self.poller(msg)
-      
+    def new_msg(self, msg):
+        if self.recent_command == 'leistungspoll':
+            self.poller(msg)
+
+    def sender_has_permission(self, msg):
+        sender = bot.get_chat_member(msg.chat.id, msg.from_user.id)
+        return sender.status == 'administrator' or sender.status == 'creator'
 
 
 cmd = Commands(bot)
+
 
 @bot.message_handler(commands=['showIds'])
 def showIds(message):
@@ -133,6 +142,7 @@ def showIds(message):
 
     except Exception as error:
         bot.send_message(CHAT_ID, str(error))
+
 
 @bot.message_handler(commands=['stats', 'groups'])
 def stats(message):
@@ -147,19 +157,23 @@ def stats(message):
                         no_of_polls = len(group_ids)
                         no_of_groups = len(list(set(group_ids)))
                 group_ids.clear()
-                bot.reply_to(message, f'Number of polls Made: {no_of_polls}\n#Nr of groups bot has been added to: {no_of_groups}')
+                bot.reply_to(
+                    message, f'Number of polls Made: {no_of_polls}\n#Nr of groups bot has been added to: {no_of_groups}')
                 file.close()
         else:
-                        bot.reply_to(message, f'Sorry {message.from_user.username}! You Are Not Allowed To Use This Command,')
+            bot.reply_to(
+                message, f'Sorry {message.from_user.username}! You Are Not Allowed To Use This Command,')
     except Exception as error:
-                            bot.send_message(CHAT_ID, f'Hi Devs!!\nHandle This Error plox\n{error}')
-                            try:
-                                group_ids.clear()
-                            except:
-                                pass
-                            bot.reply_to(message, f'An error occurred!\nError: {error}')
-                            bot.send_message(CHAT_ID, f'An error occurred!\nError: {error}')
-                            bot.send_document(CHAT_ID, '{message}')
+        bot.send_message(
+            CHAT_ID, f'Hi Devs!!\nHandle This Error plox\n{error}')
+        try:
+            group_ids.clear()
+        except:
+            pass
+        bot.reply_to(message, f'An error occurred!\nError: {error}')
+        bot.send_message(CHAT_ID, f'An error occurred!\nError: {error}')
+        bot.send_document(CHAT_ID, '{message}')
+
 
 @bot.message_handler(commands=['botlogs'])
 def ViewTheLogsFile(message):
@@ -167,35 +181,46 @@ def ViewTheLogsFile(message):
         if message.from_user.username in USERNAMES:
             print('Owner Asked For The Logs!')
             file = open('POLL_LOGS.txt', 'r')
-            bot.send_document(message.chat.id, file, timeout=60, disable_notification=True)
+            bot.send_document(message.chat.id, file,
+                              timeout=60, disable_notification=True)
             file.close()
             print('Logs Sent To Owner')
         else:
-            bot.reply_to(message, f'Sorry {message.from_user.username}! You Are Not Allowed For This Command,')
+            bot.reply_to(
+                message, f'Sorry {message.from_user.username}! You Are Not Allowed For This Command,')
     except Exception as error:
         bot.reply_to(message, f'Error: {error}')
-        
-        
+
 
 @bot.message_handler(commands=['leistungspoll'])
 def pollNow(message):
+    if not cmd.sender_has_permission(message):
+        bot.reply_to(
+            message, 'Diese Funktion ist nicht für den Pöbel gedacht.')
+        return
     cmd.leistungspoll(message)
+
 
 @bot.message_handler(commands=['help'])
 def helper(message):
     return bot.reply_to(message, f'''
 ''')
 
+
 @bot.message_handler(commands=['purge'])
 def purge(message):
+    if not cmd.sender_has_permission(message):
+        bot.reply_to(
+            message, 'Diese Funktion ist nicht für den Pöbel gedacht.')
+        return
     try:
         with open('recentpoll.txt', 'r') as id:
             msg = json.load(id)
             bot.delete_message(msg['chat_id'], msg['message_id'])
             with open('ltcounter.txt', 'r') as cnt:
-              ltcounter = int(cnt.readline()) - 1
-              with open('ltcounter.txt', 'w') as cnt:
-                cnt.write(str(ltcounter))
+                ltcounter = int(cnt.readline()) - 1
+                with open('ltcounter.txt', 'w') as cnt:
+                    cnt.write(str(ltcounter))
     except IndexError:
         return bot.reply_to(message, f'''Lol!!! An error in the wild:
 {message.text}
@@ -204,7 +229,7 @@ Which is invalid.
 For more help use: /help
 ''')
     except Exception as error:
-        bot.send_message(CHAT_ID,f'''Error From Poll Bot!
+        bot.send_message(CHAT_ID, f'''Error From Poll Bot!
 
 Error  :: {error}
 
@@ -227,14 +252,17 @@ The Complete Detail:
 
 
 ''')
-        
+
         return bot.reply_to(message, f'''An Unexpected Error Occured!
 Error::  {error}
 The error was informed to @eckphi''')
 
+
 @bot.message_handler(commands=['alive'])
 def alive(message):
-    bot.reply_to(message, f'Hey {message.from_user.username}, Ready To Serve You')
+    bot.reply_to(
+        message, f'Hey {message.from_user.username}, Ready To Serve You')
+
 
 '''err_count = 0 #Check for errors
 while True:
@@ -247,21 +275,26 @@ while True:
         if err_count == 10:
             break
 '''
+
+
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.reply_to(message, f'Heya {message.from_user.username}, I am there to help you in polls. But this cmd is bit old try /help.')
+    bot.reply_to(
+        message, f'Heya {message.from_user.username}, I am there to help you in polls. But this cmd is bit old try /help.')
 
-@bot.message_handler(content_types = ['text'])
+
+@bot.message_handler(content_types=['text'])
 def new_msg(message):
-  cmd.new_msg(message)
+    cmd.new_msg(message)
 
-err_count = 0 #Check for errors
+
+err_count = 0  # Check for errors
 while True:
     try:
         bot.polling()
     except FileNotFoundError as e:
         print(e)
-        err_count +=1
+        err_count += 1
         print(f'Error Number: {err_count}')
         if err_count == 10:
             break
