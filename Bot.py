@@ -37,7 +37,8 @@ BOT_TOKEN = '5277349785:AAGbCz4ozwI0l5CnkqHv2ZKhDdGi0s7Rnw0'  # YOUR BOT TOKEN H
 API_HASH = '60f71bfe3b2f6e386597050b61ae03d7'
 API_ID = '13242285'  # YOUR API ID GET FROM my.telegram.org
 CHAT_ID = '-666753063'  # YOUR PRIVATE GROUP TO VIEW LOGS OR ERROR
-LEISTUNGSCHAT_ID = '-1001503308928'  # '-1001517264648'
+LEISTUNGSCHAT_ID = '-1001517264648'
+LEISTUNGSADMIN_ID = '-1001503308928'
 USERNAMES = ['eckphi']  # YOUR USERNAME THIS IS MANDTORY
 
 # ABOVE MAIN VARS -------------------------------------------------------------------|
@@ -102,7 +103,7 @@ The error was informed to @eckphi''')
                     question,
                     ["Bin dabei", "Keine Zeit"],
                     allows_multiple_answers=False,
-                    explanation="uiuiuiui",
+                    explanation="Soi i da jez a nu erklährn wie ma obstimmt?",
                     open_period=None,
                     type='quiz',
                     correct_option_id=0,
@@ -127,6 +128,7 @@ For more help use: /help
     def new_msg(self, msg):
         if self.recent_command == 'leistungspoll':
             self.poller(msg)
+            self.recent_command = None
         elif 'nude' in msg.text.lower():
             self.send_nude(msg)
 
