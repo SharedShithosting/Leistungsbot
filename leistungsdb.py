@@ -43,7 +43,8 @@ class LeistungsDB(object):
                 host=self.config['mysql']['host'],
                 database=self.config['mysql']['db'],
                 user=self.config['mysql']['user'],
-                password=self.config['mysql']['password']
+                password=self.config['mysql']['password'],
+                ssl_disabled=True
             )
         except Exception as e:
             print("Error while connecting to MySQL", e)
