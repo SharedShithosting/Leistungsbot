@@ -305,7 +305,7 @@ class LeistungsBot(object):
                     self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
                 bot.send_document(self.helper.config['chat_id'], '{message}')
 
-        @bot.message_handler(commands=['location'])
+        @bot.message_handler(commands=['add_location'])
         def request_location(message):
             try:
                 self.bot.set_state(message.from_user.id,

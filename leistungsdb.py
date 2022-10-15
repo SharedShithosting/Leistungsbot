@@ -241,15 +241,6 @@ class LeistungsDB(object):
         cursor.execute(sql, values)
         self.mydb.commit()
 
-    def getLeistungsTagKeyDate(self, date: datetime):
-        cursor = self.mydb.cursor()
-        sql = "SELECT `key` FROM `leistungstag` WHERE `date` = %s;"
-        # .strftime('%Y-%m-%d')
-        values = (date,)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
-        return self.convert(cursor.fetchone(), True)
-
     def getLeistungsTagKeyPollId(self, poll_id: int):
         cursor = self.mydb.cursor()
         sql = "SELECT `key` FROM `leistungstag` WHERE `poll_id` = %s;"
