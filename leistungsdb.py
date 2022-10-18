@@ -11,8 +11,22 @@ class LeistungsDB(object):
     def __init__(self):
         self.google = Places()
         self.config = yaml.safe_load(open("BotConfig.yml"))
-        self.mydb = None
         self.connect()
+
+    def connect(self):
+        try:
+            self.mydb = mysql.connector.connect(
+                host=self.config['mysql']['host'],
+                database=self.config['mysql']['db'],
+                user=self.config['mysql']['user'],
+                password=self.config['mysql']['password'],
+                ssl_disabled=True
+            )
+            return True
+        except Exception as e:
+            self.mydb = mysql.connector.MySQLConnection()
+            logging.error("Error while connecting to MySQL", e)
+            return False
 
     def convert(self, mysql_res, skinny_bitch=False):
         if not mysql_res:
@@ -37,18 +51,6 @@ class LeistungsDB(object):
 
         return mysql_res
 
-    def connect(self):
-        try:
-            self.mydb = mysql.connector.connect(
-                host=self.config['mysql']['host'],
-                database=self.config['mysql']['db'],
-                user=self.config['mysql']['user'],
-                password=self.config['mysql']['password'],
-                ssl_disabled=True
-            )
-        except Exception as e:
-            print("Error while connecting to MySQL", e)
-
     def checkConnection(self):
         if self.mydb.is_connected():
             db_Info = self.mydb.get_server_info()
@@ -60,6 +62,11 @@ class LeistungsDB(object):
         return self.mydb.is_connected()
 
     def addUser(self, user_id: int, chat_id: int = None):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         cursor = self.mydb.cursor()
         try:
             sql = """INSERT INTO `members` (`user_id`, `chat_id`, `score`, `joined`)
@@ -75,6 +82,11 @@ class LeistungsDB(object):
         self.mydb.commit()
 
     def getUsers(self):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         cursor = self.mydb.cursor()
         sql = "SELECT * FROM `members`;"
         values = ()
@@ -83,6 +95,11 @@ class LeistungsDB(object):
         return self.convert(cursor.fetchall())
 
     def getUserKey(self, user_id):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         cursor = self.mydb.cursor()
         sql = "SELECT `key` FROM `members` WHERE `user_id` = %s;"
         values = (user_id,)
@@ -91,6 +108,11 @@ class LeistungsDB(object):
         return self.convert(cursor.fetchone(), True)
 
     def getUserScore(self, user_id: int):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         cursor = self.mydb.cursor()
         sql = "SELECT `score` FROM `members` WHERE `user_id` = %s;"
         values = (user_id,)
@@ -99,6 +121,11 @@ class LeistungsDB(object):
         return self.convert(cursor.fetchone(), True)
 
     def setUserScore(self, user_id: int, score: int):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         cursor = self.mydb.cursor()
         sql = "UPDATE `members` SET `score` = 'NULL', chat_id = %s WHERE `user_id` = %s;"
         values = (score, user_id,)
@@ -110,6 +137,11 @@ class LeistungsDB(object):
         self.setUserScore(user_id, self.getUserScore(user_id) + value)
 
     def removeUser(self, user_id: int):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         cursor = self.mydb.cursor()
         sql = "UPDATE `members` SET `left` = %s WHERE `user_id` = %s;"
         # .strftime('%Y-%m-%d %H:%M:%S')
@@ -119,6 +151,11 @@ class LeistungsDB(object):
         self.mydb.commit()
 
     def addLocation(self, place_id: str, name: str):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         info = self.google.getPlaceInfo(place_id)
         cursor = self.mydb.cursor()
         retry = True
@@ -127,8 +164,8 @@ class LeistungsDB(object):
         while (retry):
             try:
                 sql = "INSERT INTO `locations` (`name`, `google-place-id`, `location`, `address`, `phone`, `url`) VALUES (%s, %s, PointFromText('POINT(%s %s)'), %s, %s, %s);"
-                values = (name, place_id, info['geometry']['location']['lat'], info['geometry']
-                          ['location']['lng'], info['formatted_address'], info['international_phone_number'], info['url'])
+                values = (name, place_id, info.get('geometry', {}).get('location', {}).get('lat', None), info.get('geometry', {}).get(
+                    'location', {}).get('lng', None), info.get('formatted_address', None), info.get('international_phone_number', None), info.get('url', None))
                 logging.debug(sql % values)
                 cursor.execute(sql, values)
                 retry = False
@@ -138,6 +175,11 @@ class LeistungsDB(object):
         self.mydb.commit()
 
     def getAllLocations(self):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         cursor = self.mydb.cursor()
         sql = "SELECT `name` FROM `locations`;"
         values = ()
@@ -146,6 +188,11 @@ class LeistungsDB(object):
         return self.convert(cursor.fetchall())
 
     def getLocationKey(self, location_name):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         cursor = self.mydb.cursor()
         sql = "SELECT `key` FROM `locations` WHERE `name` = %s;"
         values = (location_name,)
@@ -154,6 +201,11 @@ class LeistungsDB(object):
         return self.convert(cursor.fetchone(), True)
 
     def getLocationName(self, location_key):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         cursor = self.mydb.cursor()
         sql = "SELECT `name` FROM `locations` WHERE `key` = %s;"
         values = (location_key,)
@@ -162,6 +214,11 @@ class LeistungsDB(object):
         return self.convert(cursor.fetchone(), True)
 
     def getVisitedLocations(self):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         cursor = self.mydb.cursor()
         sql = "SELECT `name`, `key` FROM `locations` WHERE `visited` = TRUE;"
         values = ()
@@ -170,6 +227,11 @@ class LeistungsDB(object):
         return self.convert(cursor.fetchall())
 
     def getVirgineLocations(self):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         cursor = self.mydb.cursor()
         sql = "SELECT `name`, `key` FROM `locations` WHERE `visited` = FALSE;"
         values = ()
@@ -178,6 +240,11 @@ class LeistungsDB(object):
         return self.convert(cursor.fetchall())
 
     def getLocationInfo(self, location_name):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         cursor = self.mydb.cursor(dictionary=True)
         sql = "SELECT `name`, `google-place-id`, ST_asText(`location`) AS `location`, `address`, `phone`, `url`, `visited` FROM `locations` WHERE `name` = %s;"
         values = (location_name,)
@@ -186,6 +253,11 @@ class LeistungsDB(object):
         return self.convert(cursor.fetchone(), True)
 
     def setLocationVisited(self, location_name):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         cursor = self.mydb.cursor()
         sql = "UPDATE `locations` SET `visited` = TRUE WHERE `name` = %s;"
         values = (location_name,)
@@ -194,6 +266,11 @@ class LeistungsDB(object):
         self.mydb.commit()
 
     def rateLocation(self, location_name, user_id, rating):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         uKey = self.getUserKey(user_id)
         lKey = self.getLocationKey(location_name)
         cursor = self.mydb.cursor()
@@ -204,6 +281,11 @@ class LeistungsDB(object):
         self.mydb.commit()
 
     def getAvgLocationRating(self, location_name):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         lKey = self.getLocationKey(location_name)
         cursor = self.mydb.cursor()
         sql = "SELECT AVG(`rating`) FROM `location_rating` WHERE `location` = %s;"
@@ -213,6 +295,11 @@ class LeistungsDB(object):
         return self.convert(cursor.fetchall())
 
     def getUserLocationRating(self, location_name, user_id):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         uKey = self.getUserKey(user_id)
         lKey = self.getLocationKey(location_name)
         cursor = self.mydb.cursor(dictionary=True)
@@ -223,6 +310,11 @@ class LeistungsDB(object):
         return self.convert(cursor.fetchone(), True)
 
     def getAvgUserLocationRating(self, user_id):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         uKey = self.getUserKey(user_id)
         cursor = self.mydb.cursor()
         sql = "SELECT AVG(`rating`) FROM `location_rating` WHERE `member` = %s;"
@@ -232,6 +324,11 @@ class LeistungsDB(object):
         return self.convert(cursor.fetchall())
 
     def addLeistungsTag(self, date: datetime, location_name: str, poll_id: int, venue_id: int, type: int):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         lKey = self.getLocationKey(location_name)
         cursor = self.mydb.cursor()
         sql = "INSERT INTO `leistungstag` (`location`, `date`, `poll_id`, `venue_id`, `type`) VALUES (%s, %s, %s, %s, %s);"
@@ -242,6 +339,11 @@ class LeistungsDB(object):
         self.mydb.commit()
 
     def getLeistungsTagKeyPollId(self, poll_id: int):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         cursor = self.mydb.cursor()
         sql = "SELECT `key` FROM `leistungstag` WHERE `poll_id` = %s;"
         values = (poll_id,)
@@ -250,6 +352,11 @@ class LeistungsDB(object):
         return self.convert(cursor.fetchone(), True)
 
     def getOpenLeistungsTag(self, type: int = None):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         cursor = self.mydb.cursor(dictionary=True)
         if type:
             sql = "SELECT * FROM `leistungstag` WHERE `type` = %s AND `closed` = %s ORDER BY `date`;"
@@ -262,6 +369,11 @@ class LeistungsDB(object):
         return self.convert(cursor.fetchall())
 
     def getClosedLeistungsTag(self, type: int = None):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         cursor = self.mydb.cursor(dictionary=True)
         if type:
             sql = "SELECT * FROM `leistungstag` WHERE `type` = %s AND `closed` = %s ORDER BY `date`;"
@@ -274,6 +386,11 @@ class LeistungsDB(object):
         return self.convert(cursor.fetchall())
 
     def closeLeistungstag(self, leistungstag_key: int):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         cursor = self.mydb.cursor()
         sql = "UPDATE `leistungstag` SET `closed` = %s WHERE `key` = %s;"
         values = (True, leistungstag_key,)
@@ -282,6 +399,11 @@ class LeistungsDB(object):
         self.mydb.commit()
 
     def getHistory(self, type: int = None):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         cursor = self.mydb.cursor(dictionary=True)
         if type:
             sql = "SELECT * FROM `leistungstag` WHERE `type` = %s ORDER BY `date`;"
@@ -294,6 +416,11 @@ class LeistungsDB(object):
         return self.convert(cursor.fetchall())
 
     def getHistoryCount(self, type: int = None):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         cursor = self.mydb.cursor()
         if type:
             sql = "SELECT COUNT(*) FROM `leistungstag` WHERE `type` = %s;"
@@ -306,6 +433,11 @@ class LeistungsDB(object):
         return self.convert(cursor.fetchone(), True)
 
     def getLatest(self, type: int = None):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         cursor = self.mydb.cursor(dictionary=True)
         if type:
             sql = "SELECT * FROM `leistungstag` WHERE `type` = %s ORDER BY `date` DESC LIMIT 1;"
@@ -318,6 +450,11 @@ class LeistungsDB(object):
         return self.convert(cursor.fetchone(), True)
 
     def getParticipants(self, leistungstag_key: int):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         cursor = self.mydb.cursor()
         sql = "SELECT `member` FROM `participants` WHERE `event` = %s;"
         values = (leistungstag_key,)
@@ -330,6 +467,11 @@ class LeistungsDB(object):
         return self.getParticipants(key)
 
     def addParticipant(self, user_id: int, poll_id: int):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
         user_key = self.getUserKey(user_id)
         leistungstag_key = self.getLeistungsTagKeyPollId(poll_id)
         cursor = self.mydb.cursor()
