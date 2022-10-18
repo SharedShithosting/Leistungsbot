@@ -68,13 +68,16 @@ class Helper(object):
                 location[0], callback_data=json.dumps({'location': location[1]})))
         return markup
 
-    def search_location_button(self, query):
+    def search_location(self, query):
+        g_places = self.google.findPlace(query)
+        return len(g_places), self.store_to_rand_file(g_places)
+
+    def search_location_button(self, rand_id):
+        g_places = self.peak_from_rand_file(rand_id)
         markup = InlineKeyboardMarkup(row_width=1)
-        g = self.google.findPlace(query)
-        rand_id = self.store_to_rand_file(g)
-        for i in range(len(g)):
+        for i in range(len(g_places)):
             markup.add(InlineKeyboardButton(
-                g[i]['name'], callback_data=json.dumps({'search': (rand_id, i)})))
+                g_places[i]['name'], callback_data=json.dumps({'search': (rand_id, i)})))
         return markup
 
     def restore_search_location_button(self, rand_id):
@@ -176,9 +179,11 @@ class Helper(object):
 
     def publish_leistungstag(self, rand_id):
         vals = self.load_from_rand_file(rand_id)
-        # TODO Change chat-id
         self.send_leistungstag(
-            self.config['leistungsadmin_id'], vals[0], vals[1], vals[2], False)
+            self.config['leistungschat_id'], vals[0], vals[1], vals[2], False)
+
+    def get_rand_len(self, rand_id):
+        return len(self.peak_from_rand_file(rand_id))
 
     def excep(self, msg, error):
         self.bot.send_message(self.config['chat_id'], f'''Error From Poll Bot!

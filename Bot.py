@@ -57,7 +57,7 @@ API_ID = config['api_id']  # YOUR API ID GET FROM my.telegram.org
 CHAT_ID = config['chat_id']  # YOUR PRIVATE GROUP TO VIEW LOGS OR ERROR
 LEISTUNGSCHAT_ID = config['leistungschat_id']
 LEISTUNGSADMIN_ID = config['leistungsadmin_id']
-LEISTUNGSCHAT_ID = LEISTUNGSADMIN_ID
+#LEISTUNGSCHAT_ID = LEISTUNGSADMIN_ID
 USERNAMES = config['usernames']  # YOUR USERNAME THIS IS MANDTORY
 
 # ABOVE MAIN VARS -------------------------------------------------------------------|
@@ -95,8 +95,12 @@ class LeistungsBot(object):
                         call.message.chat.id, val[0], val[1])
                 elif cmd == 'select':
                     if val[1] < 0:
-                        self.bot.send_message(call.message.chat.id, 'Daun probiern mas numoi...',
-                                              reply_markup=self.helper.restore_search_location_button(val[0]))
+                        if (self.helper.get_rand_len(val[0])) == 1:
+                            self.bot.send_message(
+                                call.message.chat.id, 'Daun füg a boa mehr infos zu deiner Suche dazua...')
+                        else:
+                            self.bot.send_message(call.message.chat.id, 'Daun probiern mas numoi...',
+                                                  reply_markup=self.helper.restore_search_location_button(val[0]))
                     else:
                         self.helper.add_location(val[0], val[1])
                 elif cmd == 'cancle':
@@ -256,47 +260,10 @@ class LeistungsBot(object):
                     self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
                 bot.send_document(self.helper.config['chat_id'], '{message}')
 
-        @bot.message_handler(state=LeistungsState.pollLocation)
-        def getPollLocation(message):
-            try:
-                self.process_poll_location(message)
-            except Exception as error:
-                bot.send_message(
-                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
-                bot.reply_to(message, f'An error occurred!\nError: {error}')
-                bot.send_message(
-                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
-                bot.send_document(self.helper.config['chat_id'], '{message}')
-
-        @bot.message_handler(state="*", commands=['cancle'])
-        def cancel(message):
-            try:
-                self.process_cancle(message)
-            except Exception as error:
-                bot.send_message(
-                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
-                bot.reply_to(message, f'An error occurred!\nError: {error}')
-                bot.send_message(
-                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
-                bot.send_document(self.helper.config['chat_id'], '{message}')
-
-        @bot.message_handler(content_types=['text'])
-        def new_msg(message):
-            try:
-                if 'nude' in message.text:
-                    self.process_send_nudes(message)
-            except Exception as error:
-                bot.send_message(
-                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
-                bot.reply_to(message, f'An error occurred!\nError: {error}')
-                bot.send_message(
-                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
-                bot.send_document(self.helper.config['chat_id'], '{message}')
-
         @bot.message_handler(commands=['sendnudes'])
         def send_nudes(message):
             try:
-                self.process_send_nudes(message)
+                self.process_send_nudes(message.chat.id)
             except Exception as error:
                 bot.send_message(
                     self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
@@ -320,11 +287,48 @@ class LeistungsBot(object):
                     self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
                 bot.send_document(self.helper.config['chat_id'], '{message}')
 
+        @bot.message_handler(state="*", commands=['cancle'])
+        def cancel(message):
+            try:
+                self.process_cancle(message)
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
+                bot.send_document(self.helper.config['chat_id'], '{message}')
+
+        @bot.message_handler(state=LeistungsState.pollLocation)
+        def getPollLocation(message):
+            try:
+                self.process_poll_location(message)
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
+                bot.send_document(self.helper.config['chat_id'], '{message}')
+
         @bot.message_handler(state=LeistungsState.searchLocation)
         def search_location(message):
             try:
                 self.process_search_location(
                     message.chat.id, message.text.strip())
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
+                bot.send_document(self.helper.config['chat_id'], '{message}')
+
+        @bot.message_handler(content_types=['text'])
+        def new_msg(message):
+            try:
+                if 'nude' in message.text:
+                    self.process_send_nudes(message.chat.id)
             except Exception as error:
                 bot.send_message(
                     self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
@@ -366,8 +370,15 @@ class LeistungsBot(object):
         self.helper.send_nude(message)
 
     def process_search_location(self, chat_id, query):
-        self.bot.send_message(chat_id, 'Suach da aus wost willst, oda schick ma wos aunders',
-                              reply_markup=self.helper.search_location_button(query))
+        finds, rand_id = self.helper.search_location(query)
+        if finds < 1:
+            self.bot.send_message(
+                chat_id, f'Wenn i nach "{query}" suach find i nix...vielleicht verschriebn?')
+        elif finds == 1:
+            self.helper.approve_location(chat_id, rand_id, 0)
+        elif finds > 1:
+            self.bot.send_message(chat_id, 'Suach da aus wost willst, oda schick ma wos aunders',
+                                  reply_markup=self.helper.search_location_button(rand_id))
 
     def infinite_poll(self):
         self.bot.infinity_polling()
