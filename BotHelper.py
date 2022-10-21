@@ -242,6 +242,7 @@ class Helper(object):
         rating = self.db.getAvgLocationRating(info['name'])
 
         message = f"""*{info.get('name')}*
+{ld['date'].strftime('%d.%m.%Y')}
 {self.get_stars(rating)}
 {info.get('address')}
 {info.get('phone')}
