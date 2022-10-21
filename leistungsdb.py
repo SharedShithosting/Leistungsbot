@@ -246,21 +246,47 @@ class LeistungsDB(object):
                 raise Exception("No connection to DataBase available")
 
         cursor = self.mydb.cursor(dictionary=True)
-        sql = "SELECT `name`, `google-place-id`, ST_asText(`location`) AS `location`, `address`, `phone`, `url`, `visited` FROM `locations` WHERE `name` = %s;"
+        sql = "SELECT * FROM `locations` WHERE `name` = %s;"
         values = (location_name,)
         logging.debug(sql % values)
         cursor.execute(sql, values)
         return self.convert(cursor.fetchone(), True)
 
-    def setLocationVisited(self, location_name):
+    def getLocationInfoByKey(self, key: int):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
+        cursor = self.mydb.cursor(dictionary=True)
+        sql = "SELECT * FROM `locations` WHERE `key` = %s;"
+        values = (key,)
+        logging.debug(sql % values)
+        cursor.execute(sql, values)
+        return self.convert(cursor.fetchone(), True)
+
+    def setLocationVisitedState(self, location_name, visited=True):
         if not self.mydb.is_connected():
             if not self.connect():
                 logging.error("No connection to DataBase possible")
                 raise Exception("No connection to DataBase available")
 
         cursor = self.mydb.cursor()
-        sql = "UPDATE `locations` SET `visited` = TRUE WHERE `name` = %s;"
-        values = (location_name,)
+        sql = "UPDATE `locations` SET `visited` = %s WHERE `name` = %s;"
+        values = (visited, location_name,)
+        logging.debug(sql % values)
+        cursor.execute(sql, values)
+        self.mydb.commit()
+
+    def setLocationVisitedStateKey(self, location_key, visited=True):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
+        cursor = self.mydb.cursor()
+        sql = "UPDATE `locations` SET `visited` = %s WHERE `key` = %s;"
+        values = (visited, location_key,)
         logging.debug(sql % values)
         cursor.execute(sql, values)
         self.mydb.commit()
@@ -292,7 +318,8 @@ class LeistungsDB(object):
         values = (lKey,)
         logging.debug(sql % values)
         cursor.execute(sql, values)
-        return self.convert(cursor.fetchall())
+        res = self.convert(cursor.fetchall(), skinny_bitch=True)
+        return res if res else 0
 
     def getUserLocationRating(self, location_name, user_id):
         if not self.mydb.is_connected():
@@ -337,6 +364,19 @@ class LeistungsDB(object):
         logging.debug(sql % values)
         cursor.execute(sql, values)
         self.mydb.commit()
+
+    def getLeistungstag(self, key: int):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
+        cursor = self.mydb.cursor(dictionary=True)
+        sql = "SELECT * FROM `leistungstag` WHERE `key` = %s;"
+        values = (key,)
+        logging.debug(sql % values)
+        cursor.execute(sql, values)
+        return self.convert(cursor.fetchone(), True)
 
     def getLeistungsTagKeyPollId(self, poll_id: int):
         if not self.mydb.is_connected():
@@ -394,6 +434,19 @@ class LeistungsDB(object):
         cursor = self.mydb.cursor()
         sql = "UPDATE `leistungstag` SET `closed` = %s WHERE `key` = %s;"
         values = (True, leistungstag_key,)
+        logging.debug(sql % values)
+        cursor.execute(sql, values)
+        self.mydb.commit()
+
+    def removeLeistungstag(self, key: int):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
+        cursor = self.mydb.cursor()
+        sql = "DELETE FROM `leistungstag` WHERE `key` = %s;"
+        values = (key,)
         logging.debug(sql % values)
         cursor.execute(sql, values)
         self.mydb.commit()

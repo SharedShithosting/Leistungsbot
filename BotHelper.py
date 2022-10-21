@@ -97,6 +97,45 @@ class Helper(object):
                 {'select': (rand_id, index)})))
         return markup
 
+    def leistungstag_type_button(self, key: str):
+        markup = InlineKeyboardMarkup(row_width=1, )
+        for i in LeistungsTyp:
+            markup.add(
+                InlineKeyboardButton(
+                    i.name, callback_data=json.dumps({key: i})))
+        return markup
+
+    def leistungstag_history_type_button(self):
+        return self.leistungstag_type_button('history_type')
+
+    def leistungstag_purge_type_button(self):
+        return self.leistungstag_type_button('purge_type')
+
+    def leistungstag_button(self, key: str, type: int):
+        history = self.db.getHistory(type)
+        markup = InlineKeyboardMarkup(row_width=1)
+        for i in range(len(history)):
+            name = str(i+1) + '.' + \
+                self.db.getLocationName(history[i]['location'])
+            markup.add(InlineKeyboardButton(
+                name, callback_data=json.dumps({key: history[i]['key']})))
+        return markup
+
+    def leistungstag_history_button(self, type):
+        return self.leistungstag_button('history', type)
+
+    def leistungstag_dry_purge_button(self, type):
+        return self.leistungstag_button('dry_purge', type)
+
+    def leistungstag_purge_button(self, key):
+        markup = InlineKeyboardMarkup(row_width=2, )
+        markup.add(
+            InlineKeyboardButton(
+                'Des mochn ma ned!', callback_data=json.dumps({'cancle': None})),
+            InlineKeyboardButton('Weg damit', callback_data=json.dumps(
+                {'purge': key})))
+        return markup
+
     def unkown_location_button(self, location):
         markup = InlineKeyboardMarkup(row_width=2, )
         markup.add(
@@ -161,6 +200,7 @@ class Helper(object):
         else:
             self.db.addLeistungsTag(
                 date, location, poll_id.message_id, venue_id.message_id, int(type))
+            self.db.setLocationVisitedState(location, True)
 
     def send_location_info(self, chat_id, place_id, reply_markup=None):
         info = self.google.getPlaceInfo(place_id)
@@ -184,6 +224,59 @@ class Helper(object):
 
     def get_rand_len(self, rand_id):
         return len(self.peak_from_rand_file(rand_id))
+
+    def get_stars(self, rating: float):
+        res = '🌕' * int(rating)
+        rating -= int(rating)
+        if rating >= 0.625:
+            res += '🌖'
+        elif rating >= 0.325:
+            res += '🌗'
+        elif rating > 0:
+            res += '🌘'
+        return res.ljust(5, '🌑')
+
+    def send_history_info(self, chat_id, leistungstag_key: int):
+        ld = self.db.getLeistungstag(leistungstag_key)
+        info = self.db.getLocationInfoByKey(ld['location'])
+        rating = self.db.getAvgLocationRating(info['name'])
+
+        message = f"""*{info.get('name')}*
+{self.get_stars(rating)}
+{info.get('address')}
+{info.get('phone')}
+{info.get('url')}"""
+
+        self.bot.send_message(
+            chat_id, message.replace('.', '\.').replace('=', '\=').replace('+', '\+'), parse_mode='MarkdownV2')
+
+    def send_purge_info(self, chat_id, leistungstag_key: int):
+        ld = self.db.getLeistungstag(leistungstag_key)
+        info = self.db.getLocationInfoByKey(ld['location'])
+        rating = self.db.getAvgLocationRating(info['name'])
+
+        message = f"""*{info.get('name')}*
+{self.get_stars(rating)}
+{info.get('address')}
+{info.get('phone')}
+{info.get('url')}"""
+
+        self.bot.send_message(
+            chat_id, message.replace('.', '\.').replace('=', '\=').replace('+', '\+'), parse_mode='MarkdownV2', reply_markup=self.leistungstag_purge_button(leistungstag_key))
+
+    def purge_leistungstag(self, leistungstag_key: int):
+        ld = self.db.getLeistungstag(leistungstag_key)
+        res = False
+        try:
+            res = self.bot.delete_message(
+                self.config['leistungschat_id'], ld['poll_id'])
+            res &= self.bot.delete_message(
+                self.config['leistungschat_id'], ld['venue_id'])
+        except:
+            pass
+        self.db.setLocationVisitedStateKey(ld['location'], False)
+        self.db.removeLeistungstag(leistungstag_key)
+        return res
 
     def excep(self, msg, error):
         self.bot.send_message(self.config['chat_id'], f'''Error From Poll Bot!

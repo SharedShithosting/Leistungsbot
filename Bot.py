@@ -70,6 +70,8 @@ class LeistungsState(StatesGroup):
     # Just name variables differently
     pollLocation = State()  # creating instances of State class is enough from now
     searchLocation = State()
+    purgeLeistungstag = State()
+    historyLeistungstag = State()
 
 
 class LeistungsBot(object):
@@ -107,10 +109,29 @@ class LeistungsBot(object):
                     self.process_cancle(call.message)
                 elif cmd == 'publish':
                     self.helper.publish_leistungstag(val)
-                    bot.edit_message_text(
-                        call.message.chat.id, 'Hauma so veröffentlicht', call.message.message_id)
+                    bot.send_message(
+                        call.message.chat.id, 'Hauma so veröffentlicht')
                 elif cmd == 'q':
                     self.process_search_location(call.message.chat.id, val)
+                elif cmd == 'history_type':
+                    self.bot.send_message(call.message.chat.id, 'Welchen Leistungstag willst da anschaun?',
+                                          reply_markup=self.helper.leistungstag_history_button(LeistungsTyp(val)))
+                elif cmd == 'purge_type':
+                    self.bot.send_message(call.message.chat.id, 'Welchen Leistungstag willst löschen?',
+                                          reply_markup=self.helper.leistungstag_dry_purge_button(LeistungsTyp(val)))
+                elif cmd == 'history':
+                    self.helper.send_history_info(
+                        call.message.chat.id, val)
+                elif cmd == 'dry_purge':
+                    self.helper.send_purge_info(
+                        call.message.chat.id, val)
+                elif cmd == 'purge':
+                    if self.helper.purge_leistungstag(val):
+                        bot.send_message(
+                            call.message.chat.id, 'zack und weg ises')
+                    else:
+                        bot.send_message(
+                            call.message.chat.id, 'De Nachrichtn muast leida manuell löschen')
                 else:
                     bot.send_message(
                         self.helper.config['chat_id'], f'Hi Devs!!\nHandle this callback\n{cmd}')
@@ -195,13 +216,7 @@ class LeistungsBot(object):
                     message, 'Diese Funktion ist nicht für den Pöbel gedacht.')
                 return
             try:
-                with open('recentpoll.txt', 'r') as id:
-                    msg = json.load(id)
-                    bot.delete_message(msg['chat_id'], msg['message_id'])
-                    with open('ltcounter.txt', 'r') as cnt:
-                        ltcounter = int(cnt.readline()) - 1
-                        with open('ltcounter.txt', 'w') as cnt:
-                            cnt.write(str(ltcounter))
+                self.process_purge(message)
             except IndexError:
                 return bot.reply_to(message, f'''Lol!!! An error in the wild:
         {message.text}
@@ -285,7 +300,17 @@ class LeistungsBot(object):
                 bot.reply_to(message, f'An error occurred!\nError: {error}')
                 bot.send_message(
                     self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
-                bot.send_document(self.helper.config['chat_id'], '{message}')
+
+        @bot.message_handler(commands=['history'])
+        def request_location(message):
+            try:
+                self.process_history(message)
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
 
         @bot.message_handler(state="*", commands=['cancle'])
         def cancel(message):
@@ -379,6 +404,16 @@ class LeistungsBot(object):
         elif finds > 1:
             self.bot.send_message(chat_id, 'Suach da aus wost willst, oda schick ma wos aunders',
                                   reply_markup=self.helper.search_location_button(rand_id))
+
+    def process_history(self, message):
+        self.bot.send_message(message.chat.id, 'Welche Art von Leistungstag willst da anschaun?',
+                              reply_markup=self.helper.leistungstag_history_type_button())
+
+    def process_purge(self, message):
+        self.bot.send_animation(
+            message.chat.id, 'https://giphy.com/gifs/MCZ39lz83o5lC',
+            caption='Welche Art von Leistungstag willst löschen?',
+            reply_markup=self.helper.leistungstag_purge_type_button())
 
     def infinite_poll(self):
         self.bot.infinity_polling()
