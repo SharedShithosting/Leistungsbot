@@ -144,7 +144,6 @@ class LeistungsBot(object):
                     call.message, f'An error occurred!\nError: {error}')
                 bot.send_message(
                     self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
-                bot.send_document(self.helper.config['chat_id'], '{message}')
 
         @bot.message_handler(commands=['showIds'])
         def showIds(message):
@@ -186,7 +185,6 @@ class LeistungsBot(object):
                 bot.reply_to(message, f'An error occurred!\nError: {error}')
                 bot.send_message(
                     self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
-                bot.send_document(self.helper.config['chat_id'], '{message}')
 
         @bot.message_handler(commands=['botlogs'])
         def ViewTheLogsFile(message):
@@ -273,7 +271,6 @@ class LeistungsBot(object):
                 bot.reply_to(message, f'An error occurred!\nError: {error}')
                 bot.send_message(
                     self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
-                bot.send_document(self.helper.config['chat_id'], '{message}')
 
         @bot.message_handler(commands=['sendnudes'])
         def send_nudes(message):
@@ -285,7 +282,6 @@ class LeistungsBot(object):
                 bot.reply_to(message, f'An error occurred!\nError: {error}')
                 bot.send_message(
                     self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
-                bot.send_document(self.helper.config['chat_id'], '{message}')
 
         @bot.message_handler(commands=['add_location'])
         def request_location(message):
@@ -322,7 +318,6 @@ class LeistungsBot(object):
                 bot.reply_to(message, f'An error occurred!\nError: {error}')
                 bot.send_message(
                     self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
-                bot.send_document(self.helper.config['chat_id'], '{message}')
 
         @bot.message_handler(state=LeistungsState.pollLocation)
         def getPollLocation(message):
@@ -334,7 +329,6 @@ class LeistungsBot(object):
                 bot.reply_to(message, f'An error occurred!\nError: {error}')
                 bot.send_message(
                     self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
-                bot.send_document(self.helper.config['chat_id'], '{message}')
 
         @bot.message_handler(state=LeistungsState.searchLocation)
         def search_location(message):
@@ -347,7 +341,6 @@ class LeistungsBot(object):
                 bot.reply_to(message, f'An error occurred!\nError: {error}')
                 bot.send_message(
                     self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
-                bot.send_document(self.helper.config['chat_id'], '{message}')
 
         @bot.message_handler(content_types=['text'])
         def new_msg(message):
@@ -360,7 +353,6 @@ class LeistungsBot(object):
                 bot.reply_to(message, f'An error occurred!\nError: {error}')
                 bot.send_message(
                     self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
-                bot.send_document(self.helper.config['chat_id'], '{message}')
 
     def process_cancle(self, message):
         self.bot.send_message(message.chat.id, "Halt Stop.",
