@@ -34,10 +34,10 @@ class LeistungsDB(object):
 
         elif type(mysql_res) == dict:
             for k in mysql_res:
-                mysql_res[k] = self.convert(mysql_res[k])
+                mysql_res[k] = self.convert(mysql_res[k], skinny_bitch)
 
         elif type(mysql_res) in [tuple, list]:
-            mysql_res = [self.convert(i) for i in mysql_res]
+            mysql_res = [self.convert(i, skinny_bitch) for i in mysql_res]
 
             if skinny_bitch and len(mysql_res) == 1:
                 return mysql_res[0]
@@ -163,7 +163,7 @@ class LeistungsDB(object):
         cnt = 1
         while (retry):
             try:
-                sql = "INSERT INTO `locations` (`name`, `google-place-id`, `location`, `address`, `phone`, `url`) VALUES (%s, %s, PointFromText('POINT(%s %s)'), %s, %s, %s);"
+                sql = "INSERT INTO `locations` (`name`, `google-place-id`, `lat`, `lng`, `address`, `phone`, `url`) VALUES (%s, %s, %s, %s, %s, %s, %s);"
                 values = (name, place_id, info.get('geometry', {}).get('location', {}).get('lat', None), info.get('geometry', {}).get(
                     'location', {}).get('lng', None), info.get('formatted_address', None), info.get('international_phone_number', None), info.get('url', None))
                 logging.debug(sql % values)

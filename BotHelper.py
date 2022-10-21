@@ -171,8 +171,8 @@ class Helper(object):
         date_str = date.strftime('%d.%m.%Y')
         close_date = date - timedelta(hours=12)
         info = self.db.getLocationInfo(location)
-        venue_id = self.bot.send_venue(chat_id, latitude=info['location'][0],
-                                       longitude=info['location'][1], title=info['name'], address=info['address'])
+        venue_id = self.bot.send_venue(chat_id, latitude=info['lat'],
+                                       longitude=info['lng'], title=info['name'], address=info['address'])
         count = self.db.getHistoryCount(type)
         count = count + 1 if count else 1
         if (type == LeistungsTyp.NORMAL):
