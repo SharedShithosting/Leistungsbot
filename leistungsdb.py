@@ -171,7 +171,7 @@ class LeistungsDB(object):
                 retry = False
             except mysql.connector.IntegrityError as err:
                 cnt += 1
-                name = orig_name + cnt
+                name = orig_name + str(cnt)
         self.mydb.commit()
 
     def getAllLocations(self):
