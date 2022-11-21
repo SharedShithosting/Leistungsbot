@@ -454,7 +454,7 @@ def notify_socket(clean_environment=True):
         return _empty
 
     if address[0] == "@":
-        address = "\0" + address[1:]
+        address = "\0" + str(address[1:])
 
     # SOCK_CLOEXEC was added in Python 3.2 and requires Linux >= 2.6.27.
     # It means "close this socket after fork/exec()

@@ -116,7 +116,7 @@ class Helper(object):
         markup = InlineKeyboardMarkup(row_width=1)
         for i in range(len(history)):
             name = str(i+1) + '.' + \
-                self.db.getLocationName(history[i]['location'])
+                str(self.db.getLocationName(history[i]['location']))
             markup.add(InlineKeyboardButton(
                 name, callback_data=json.dumps({key: history[i]['key']})))
         return markup
