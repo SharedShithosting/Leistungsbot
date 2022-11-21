@@ -8,4 +8,4 @@ mysql-connector-python==8.0.29
 urllib3
 googlemaps
 pyyaml
-localStoragePy
+schedule
