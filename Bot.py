@@ -20,6 +20,7 @@ from telebot import custom_filters
 from telebot.handler_backends import State, StatesGroup  # States
 # States storage
 from telebot.storage import StateMemoryStorage
+from datetime import datetime, timedelta
 # Now, you can pass storage to bot.
 state_storage = StateMemoryStorage()  # you can init here another storage
 
@@ -271,6 +272,28 @@ class LeistungsBot(object):
                 bot.reply_to(message, f'An error occurred!\nError: {error}')
                 bot.send_message(
                     self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
+        
+        @bot.message_handler(commands=['sendreminder'])
+        def pollNow(message):
+            try:
+                self.process_reminder(message)
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
+
+        @bot.message_handler(commands=['closepoll'])
+        def pollNow(message):
+            try:
+                self.process_closepoll(message)
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
 
         @bot.message_handler(commands=['sendnudes'])
         def send_nudes(message):
@@ -382,6 +405,34 @@ class LeistungsBot(object):
         else:
             self.helper.send_leistungstag(message.chat.id, location)
             self.bot.delete_state(message.from_user.id, message.chat.id)
+
+    def process_sendreminder(self, message):
+        if not self.helper.sender_has_permission(message):
+            self.bot.reply_to(
+                message, 'Diese Funktion ist nicht für den Pöbel gedacht.')
+            return
+        polls = self.db.getOpenLeistungsTag(type)
+        for poll in polls:
+            if (datetime.now() + timedelta(days=1)).date() == poll['date']:
+                self.bot.send_message(
+                    self.config['leistungschat_id'], 'Reminder. Morgen wird reserviert. Letzte Chance zum Abstimmen 🗳️', reply_to_message_id=poll['poll_id'])
+                self.bot.send_message(message.chat.id, 'Da Reminder is draußen!',
+                            reply_markup=self.helper.location_keyboard())
+    
+    def process_closepoll(self, message):
+        if not self.helper.sender_has_permission(message):
+            self.bot.reply_to(
+                message, 'Diese Funktion ist nicht für den Pöbel gedacht.')
+            return
+        polls = self.db.getOpenLeistungsTag(type)
+        for poll in polls:
+            if (datetime.now() + timedelta(days=1)).date() == poll['date']:
+                self.bot.stop_poll(
+                    self.config['leistungschat_id'], poll['poll_id'])
+                self.bot.send_message(
+                    self.config['leistungschat_id'], 'Schluss, aus, vorbei die Wahl is glaufen und für de de abgstimmt haben is a Platzerl reserviert.', reply_to_message_id=poll['poll_id'])
+        self.bot.send_message(message.chat.id, 'De Poll is zua. I hoff für dich d Reservierung is scho erledigt!',
+                              reply_markup=self.helper.location_keyboard())
 
     def process_send_nudes(self, message):
         self.helper.send_nude(message)

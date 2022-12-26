@@ -15,7 +15,6 @@ class Scheduler(object):
         self.db = LeistungsDB()
         self.schedule = schedule
         self.schedule.every().day.at('12:00').do(self.close_poll)
-        self.schedule.every().day.at('12:30').do(self.send_reservation)
         self.schedule.every().day.at('12:00').do(self.send_reminder)
         self.start()
 
