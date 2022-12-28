@@ -13,18 +13,36 @@ import json
 import os
 import socket
 import random
-import requests
+from BotHelper import Helper, LeistungsTyp
+from BotScheduler import Scheduler
+import yaml
+from telebot import custom_filters
+from telebot.handler_backends import State, StatesGroup  # States
+# States storage
+from telebot.storage import StateMemoryStorage
+from datetime import datetime, timedelta
+# Now, you can pass storage to bot.
+state_storage = StateMemoryStorage()  # you can init here another storage
 
 # HELP TEXT ------------------------------------------------------------------------|
 '''
 User Available Commands:
-    1. /poll
-    2. /stats
-    3. /start
-    4. /help
-    5. /groups
-   
-Developer Commands: #NOTE: ONLY @eckphi are allowed for these comands:
+    1.  /leistungspoll
+    2.  /add_location
+    3.  /help
+    4.  /purge
+    5.  /mario
+    6.  /start
+    7.  /sendnudes
+    8.  /rate_location
+    9.  /show_participants
+    10. /reminde_me
+    11. /show_locations
+    12. /remove_location
+    13. /location_info
+
+Developer Commands: #NOTE: ONLY @eckphi is
+ allowed for these comands:
     1. /showIds
     2. /botlogs
 '''
@@ -32,279 +50,419 @@ Developer Commands: #NOTE: ONLY @eckphi are allowed for these comands:
 '''
 THESE ARE THE IMPORTANT VARS FOR POLL BOT
 '''
-BOT_TOKEN = '5277349785:AAGbCz4ozwI0l5CnkqHv2ZKhDdGi0s7Rnw0'  # YOUR BOT TOKEN HERE GET FROM @BotFather
+config = yaml.safe_load(open("BotConfig.yml"))
+BOT_TOKEN = config['bot_token']
 # YOUR API HASH GET FROM my.telegram.org
-API_HASH = '60f71bfe3b2f6e386597050b61ae03d7'
-API_ID = '13242285'  # YOUR API ID GET FROM my.telegram.org
-CHAT_ID = '-666753063'  # YOUR PRIVATE GROUP TO VIEW LOGS OR ERROR
-LEISTUNGSCHAT_ID = '-1001517264648'
-LEISTUNGSADMIN_ID = '-1001503308928'
-USERNAMES = ['eckphi']  # YOUR USERNAME THIS IS MANDTORY
+API_HASH = config['api_hash']
+API_ID = config['api_id']  # YOUR API ID GET FROM my.telegram.org
+CHAT_ID = config['chat_id']  # YOUR PRIVATE GROUP TO VIEW LOGS OR ERROR
+LEISTUNGSCHAT_ID = config['leistungschat_id']
+LEISTUNGSADMIN_ID = config['leistungsadmin_id']
+#LEISTUNGSCHAT_ID = LEISTUNGSADMIN_ID
+USERNAMES = config['usernames']  # YOUR USERNAME THIS IS MANDTORY
 
 # ABOVE MAIN VARS -------------------------------------------------------------------|
-bot = telebot.TeleBot(BOT_TOKEN)
 
 
-class Commands:
-    def __init__(self, bot):
-        self.bot = bot
-        self.recent_command = None
-
-    def excep(self, msg, error):
-        bot.send_message(CHAT_ID, f'''Error From Poll Bot!
-
-Error  :: {error}
-
---------------------------------
-
-Command:: {message.text}
-
---------------------------------
-
-UserDetails: {message.from_user}
-
---------------------------------
-
-Date   :: {message.date}
-
---------------------------------
-
-The Complete Detail:
-{message}
+# States group.
 
 
-''')
-
-        return self.bot.reply_to(self.message, f'''An Unexpected Error Occured!
-Error::  {error}
-The error was informed to @eckphi''')
-
-    def leistungspoll(self, msg):
-        self.recent_command = 'leistungspoll'
-        bot.reply_to(msg, 'Schick de nexte location muaz')
-
-    def poller(self, message):
-        try:
-            with open('ltcounter.txt', 'r') as cnt:
-                # The main function
-                ltcounter = int(cnt.readline()) + 1
-                ltdate = (datetime.datetime.now() + datetime.timedelta(days=(8 -
-                          datetime.datetime.now().weekday()))).strftime('%d.%m.%Y')
-                location = message.text.strip()
-                question = f'Leistungstag {ltcounter}: am {ltdate} in "{location}"'
-
-                if not location:
-                    bot.reply_to(
-                        message, 'Bist deppad, wüst mi veroaschn? Leistungstog im nix oda wos?')
-                    return False
-
-                id = bot.send_poll(
-                    LEISTUNGSCHAT_ID,
-                    question,
-                    ["Bin dabei", "Keine Zeit"],
-                    allows_multiple_answers=False,
-                    explanation="Soi i da jez a nu erklährn wie ma obstimmt?",
-                    open_period=None,
-                    type='quiz',
-                    correct_option_id=0,
-                    is_anonymous=False
-                )
-                with open('ltcounter.txt', 'w') as cnt:
-                    cnt.write(str(ltcounter))
-                with open('recentpoll.txt', 'w') as of:
-                    of.write(json.dumps(
-                        {'chat_id': LEISTUNGSCHAT_ID, 'message_id': id.id}))
-
-        except IndexError:
-            return bot.reply_to(message, f'''Lol!!! An error in the wild:
-{message.text}
-
-Which is invalid.
-For more help use: /help
-''')
-        except Exception as error:
-            self.excep(message, error)
-
-    def new_msg(self, msg):
-        if self.recent_command == 'leistungspoll':
-            self.poller(msg)
-            self.recent_command = None
-        elif 'nude' in msg.text.lower():
-            self.send_nude(msg)
-
-    def sender_has_permission(self, msg):
-        sender = bot.get_chat_member(LEISTUNGSCHAT_ID, msg.from_user.id)
-        return sender.status == 'administrator' or sender.status == 'creator'
-
-    def send_nude(self, msg):
-        gif = 'https://cdn.porngifs.com/img/%s' % (random.randint(1, 39239))
-        bot.send_animation(msg.chat.id, gif)
-        bot.reply_to(msg, 'brought to you by Maxmaier')
+class LeistungsState(StatesGroup):
+    # Just name variables differently
+    pollLocation = State()  # creating instances of State class is enough from now
+    searchLocation = State()
+    purgeLeistungstag = State()
+    historyLeistungstag = State()
 
 
-cmd = Commands(bot)
+class LeistungsBot(object):
+    def __init__(self) -> None:
+        self.bot = bot = telebot.TeleBot(config['bot_token'])
+        self.bot.add_custom_filter(custom_filters.StateFilter(self.bot))
+        self.helper = Helper(self.bot)
+        self.scheduler = Scheduler(self.bot)
 
-
-@bot.message_handler(commands=['showIds'])
-def showIds(message):
-    try:
-        if message.from_user.username in USERNAMES:
-            file = open('joined_groups.txt', 'r ')
-            bot.send_document(message.chat.id, file)
-            file.close()
-
-    except Exception as error:
-        bot.send_message(CHAT_ID, str(error))
-
-
-@bot.message_handler(commands=['stats', 'groups'])
-def stats(message):
-    try:
-        if message.from_user.username in USERNAMES:
-            print('Sending Stats To Owner')
-            with open('joined_groups.txt', 'r') as file:
-                group_ids = []
-                for line in file.readlines():
-                    for group_id in line.split(' '):
-                        group_ids.append(group_id)
-                        no_of_polls = len(group_ids)
-                        no_of_groups = len(list(set(group_ids)))
-                group_ids.clear()
+        @bot.callback_query_handler(func=lambda call: True)
+        def callback_query(call):
+            try:
+                data = json.loads(call.data)
+                if len(data) == 0:
+                    bot.answer_callback_query(
+                        call.id, 'SHHEEEEESH des hod ned funktioniert')
+                    return
+                cmd = [*data][0]
+                val = [*data.values()][0]
+                bot.answer_callback_query(call.id, 'Copy that')
+                if cmd == 'search':
+                    self.helper.approve_location(
+                        call.message.chat.id, val[0], val[1])
+                elif cmd == 'select':
+                    if val[1] < 0:
+                        if (self.helper.get_rand_len(val[0])) == 1:
+                            self.bot.send_message(
+                                call.message.chat.id, 'Daun füg a boa mehr infos zu deiner Suche dazua...')
+                        else:
+                            self.bot.send_message(call.message.chat.id, 'Daun probiern mas numoi...',
+                                                  reply_markup=self.helper.restore_search_location_button(val[0]))
+                    else:
+                        self.helper.add_location(val[0], val[1])
+                elif cmd == 'cancle':
+                    self.process_cancle(call.message)
+                elif cmd == 'publish':
+                    self.helper.publish_leistungstag(val)
+                    bot.send_message(
+                        call.message.chat.id, 'Hauma so veröffentlicht')
+                elif cmd == 'q':
+                    self.process_search_location(call.message.chat.id, val)
+                elif cmd == 'history_type':
+                    self.bot.send_message(call.message.chat.id, 'Welchen Leistungstag willst da anschaun?',
+                                          reply_markup=self.helper.leistungstag_history_button(LeistungsTyp(val)))
+                elif cmd == 'purge_type':
+                    self.bot.send_message(call.message.chat.id, 'Welchen Leistungstag willst löschen?',
+                                          reply_markup=self.helper.leistungstag_dry_purge_button(LeistungsTyp(val)))
+                elif cmd == 'history':
+                    self.helper.send_history_info(
+                        call.message.chat.id, val)
+                elif cmd == 'dry_purge':
+                    self.helper.send_purge_info(
+                        call.message.chat.id, val)
+                elif cmd == 'purge':
+                    if self.helper.purge_leistungstag(val):
+                        bot.send_message(
+                            call.message.chat.id, 'zack und weg ises')
+                    else:
+                        bot.send_message(
+                            call.message.chat.id, 'De Nachrichtn muast leida manuell löschen')
+                else:
+                    bot.send_message(
+                        self.helper.config['chat_id'], f'Hi Devs!!\nHandle this callback\n{cmd}')
+                bot.edit_message_reply_markup(
+                    call.message.chat.id, call.message.message_id)
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
                 bot.reply_to(
-                    message, f'Number of polls Made: {no_of_polls}\n#Nr of groups bot has been added to: {no_of_groups}')
-                file.close()
-        else:
+                    call.message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
+
+        @bot.message_handler(commands=['showIds'])
+        def showIds(message):
+            try:
+                if message.from_user.username in USERNAMES:
+                    file = open('joined_groups.txt', 'r ')
+                    bot.send_document(message.chat.id, file)
+                    file.close()
+
+            except Exception as error:
+                bot.send_message(self.helper.config['chat_id'], str(error))
+
+        @bot.message_handler(commands=['stats', 'groups'])
+        def stats(message):
+            try:
+                if message.from_user.username in USERNAMES:
+                    print('Sending Stats To Owner')
+                    with open('joined_groups.txt', 'r') as file:
+                        group_ids = []
+                        for line in file.readlines():
+                            for group_id in line.split(' '):
+                                group_ids.append(group_id)
+                                no_of_polls = len(group_ids)
+                                no_of_groups = len(list(set(group_ids)))
+                        group_ids.clear()
+                        bot.reply_to(
+                            message, f'Number of polls Made: {no_of_polls}\n#Nr of groups bot has been added to: {no_of_groups}')
+                        file.close()
+                else:
+                    bot.reply_to(
+                        message, f'Sorry {message.from_user.username}! You Are Not Allowed To Use This Command,')
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                try:
+                    group_ids.clear()
+                except:
+                    pass
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
+
+        @bot.message_handler(commands=['botlogs'])
+        def ViewTheLogsFile(message):
+            try:
+                if message.from_user.username in USERNAMES:
+                    print('Owner Asked For The Logs!')
+                    file = open('POLL_LOGS.txt', 'r')
+                    bot.send_document(message.chat.id, file,
+                                      timeout=60, disable_notification=True)
+                    file.close()
+                    print('Logs Sent To Owner')
+                else:
+                    bot.reply_to(
+                        message, f'Sorry {message.from_user.username}! You Are Not Allowed For This Command,')
+            except Exception as error:
+                bot.reply_to(message, f'Error: {error}')
+
+        @bot.message_handler(commands=['help'])
+        def helper(message):
+            return bot.reply_to(message, f'''
+        ''')
+
+        @bot.message_handler(commands=['purge'])
+        def purge(message):
+            if not self.helper.sender_has_permission(message):
+                bot.reply_to(
+                    message, 'Diese Funktion ist nicht für den Pöbel gedacht.')
+                return
+            try:
+                self.process_purge(message)
+            except IndexError:
+                return bot.reply_to(message, f'''Lol!!! An error in the wild:
+        {message.text}
+
+        Which is invalid.
+        For more help use: /help
+        ''')
+            except Exception as error:
+                bot.send_message(self.helper.config['chat_id'], f'''Error From Poll Bot!
+
+        Error  :: {error}
+
+        --------------------------------
+
+        Command:: {message.text}
+
+        --------------------------------
+
+        UserDetails: {message.from_user}
+
+        --------------------------------
+
+        Date   :: {message.date}
+
+        --------------------------------
+
+        The Complete Detail:
+        {message}
+
+
+        ''')
+
+                return bot.reply_to(message, f'''An Unexpected Error Occured!
+        Error::  {error}
+        The error was informed to @eckphi''')
+
+        @bot.message_handler(commands=['alive'])
+        def alive(message):
             bot.reply_to(
-                message, f'Sorry {message.from_user.username}! You Are Not Allowed To Use This Command,')
-    except Exception as error:
-        bot.send_message(
-            CHAT_ID, f'Hi Devs!!\nHandle This Error plox\n{error}')
-        try:
-            group_ids.clear()
-        except:
-            pass
-        bot.reply_to(message, f'An error occurred!\nError: {error}')
-        bot.send_message(CHAT_ID, f'An error occurred!\nError: {error}')
-        bot.send_document(CHAT_ID, '{message}')
+                message, f'Hey {message.from_user.username}, Ready To Serve You')
 
-
-@bot.message_handler(commands=['botlogs'])
-def ViewTheLogsFile(message):
-    try:
-        if message.from_user.username in USERNAMES:
-            print('Owner Asked For The Logs!')
-            file = open('POLL_LOGS.txt', 'r')
-            bot.send_document(message.chat.id, file,
-                              timeout=60, disable_notification=True)
-            file.close()
-            print('Logs Sent To Owner')
-        else:
+        @bot.message_handler(commands=['start'])
+        def start(message):
             bot.reply_to(
-                message, f'Sorry {message.from_user.username}! You Are Not Allowed For This Command,')
-    except Exception as error:
-        bot.reply_to(message, f'Error: {error}')
+                message, f'Heya {message.from_user.username}, I am there to help you in polls. But this cmd is bit old try /help.')
 
+        @bot.message_handler(commands=['leistungspoll'])
+        def pollNow(message):
+            try:
+                self.process_leistungspoll(message)
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
+        
+        @bot.message_handler(commands=['sendreminder'])
+        def pollNow(message):
+            try:
+                self.process_reminder(message)
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
 
-@bot.message_handler(commands=['leistungspoll'])
-def pollNow(message):
-    if not cmd.sender_has_permission(message):
-        bot.reply_to(
-            message, 'Diese Funktion ist nicht für den Pöbel gedacht.')
-        return
-    cmd.leistungspoll(message)
+        @bot.message_handler(commands=['closepoll'])
+        def pollNow(message):
+            try:
+                self.process_closepoll(message)
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
 
+        @bot.message_handler(commands=['sendnudes'])
+        def send_nudes(message):
+            try:
+                self.process_send_nudes(message.chat.id)
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
 
-@bot.message_handler(commands=['help'])
-def helper(message):
-    return bot.reply_to(message, f'''
-''')
+        @bot.message_handler(commands=['add_location'])
+        def request_location(message):
+            try:
+                self.bot.set_state(message.from_user.id,
+                                   LeistungsState.searchLocation, message.chat.id)
+                self.bot.send_message(
+                    message.chat.id, 'Schick dei location idee muaz')
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
 
+        @bot.message_handler(commands=['history'])
+        def request_location(message):
+            try:
+                self.process_history(message)
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
 
-@bot.message_handler(commands=['purge'])
-def purge(message):
-    if not cmd.sender_has_permission(message):
-        bot.reply_to(
-            message, 'Diese Funktion ist nicht für den Pöbel gedacht.')
-        return
-    try:
-        with open('recentpoll.txt', 'r') as id:
-            msg = json.load(id)
-            bot.delete_message(msg['chat_id'], msg['message_id'])
-            with open('ltcounter.txt', 'r') as cnt:
-                ltcounter = int(cnt.readline()) - 1
-                with open('ltcounter.txt', 'w') as cnt:
-                    cnt.write(str(ltcounter))
-    except IndexError:
-        return bot.reply_to(message, f'''Lol!!! An error in the wild:
-{message.text}
+        @bot.message_handler(state="*", commands=['cancle'])
+        def cancel(message):
+            try:
+                self.process_cancle(message)
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
 
-Which is invalid.
-For more help use: /help
-''')
-    except Exception as error:
-        bot.send_message(CHAT_ID, f'''Error From Poll Bot!
+        @bot.message_handler(state=LeistungsState.pollLocation)
+        def getPollLocation(message):
+            try:
+                self.process_poll_location(message)
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
 
-Error  :: {error}
+        @bot.message_handler(state=LeistungsState.searchLocation)
+        def search_location(message):
+            try:
+                self.process_search_location(
+                    message.chat.id, message.text.strip())
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
 
---------------------------------
+        @bot.message_handler(content_types=['text'])
+        def new_msg(message):
+            try:
+                if 'nude' in message.text:
+                    self.process_send_nudes(message.chat.id)
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
 
-Command:: {message.text}
+    def process_cancle(self, message):
+        self.bot.send_message(message.chat.id, "Halt Stop.",
+                              reply_markup=telebot.types.ReplyKeyboardRemove())
+        self.bot.delete_state(message.from_user.id, message.chat.id)
 
---------------------------------
+    def process_leistungspoll(self, message):
+        if not self.helper.sender_has_permission(message):
+            self.bot.reply_to(
+                message, 'Diese Funktion ist nicht für den Pöbel gedacht.')
+            return
+        self.bot.set_state(message.from_user.id,
+                           LeistungsState.pollLocation, message.chat.id)
+        self.bot.send_message(message.chat.id, 'Schick de nexte location muaz',
+                              reply_markup=self.helper.location_keyboard())
 
-UserDetails: {message.from_user}
+    def process_poll_location(self, message):
+        location = message.text.strip()
+        # check if location exists in database
+        info = self.helper.db.getLocationInfo(location)
+        if not info:
+            self.bot.send_message(
+                message.chat.id, f"'{location}' kenn i ned..wüstas stattdessn zur listn dazua gebn?",
+                reply_markup=self.helper.unkown_location_button(location))
+            self.bot.set_state(message.from_user.id,
+                               LeistungsState.searchLocation, message.chat.id)
+        else:
+            self.helper.send_leistungstag(message.chat.id, location)
+            self.bot.delete_state(message.from_user.id, message.chat.id)
 
---------------------------------
+    def process_sendreminder(self, message):
+        if not self.helper.sender_has_permission(message):
+            self.bot.reply_to(
+                message, 'Diese Funktion ist nicht für den Pöbel gedacht.')
+            return
+        polls = self.db.getOpenLeistungsTag(type)
+        for poll in polls:
+            if (datetime.now() + timedelta(days=1)).date() == poll['date']:
+                self.bot.send_message(
+                    self.config['leistungschat_id'], 'Reminder. Morgen wird reserviert. Letzte Chance zum Abstimmen 🗳️', reply_to_message_id=poll['poll_id'])
+                self.bot.send_message(message.chat.id, 'Da Reminder is draußen!',
+                            reply_markup=self.helper.location_keyboard())
+    
+    def process_closepoll(self, message):
+        if not self.helper.sender_has_permission(message):
+            self.bot.reply_to(
+                message, 'Diese Funktion ist nicht für den Pöbel gedacht.')
+            return
+        polls = self.db.getOpenLeistungsTag(type)
+        for poll in polls:
+            if (datetime.now() + timedelta(days=1)).date() == poll['date']:
+                self.bot.stop_poll(
+                    self.config['leistungschat_id'], poll['poll_id'])
+                self.bot.send_message(
+                    self.config['leistungschat_id'], 'Schluss, aus, vorbei die Wahl is glaufen und für de de abgstimmt haben is a Platzerl reserviert.', reply_to_message_id=poll['poll_id'])
+        self.bot.send_message(message.chat.id, 'De Poll is zua. I hoff für dich d Reservierung is scho erledigt!',
+                              reply_markup=self.helper.location_keyboard())
 
-Date   :: {message.date}
+    def process_send_nudes(self, message):
+        self.helper.send_nude(message)
 
---------------------------------
+    def process_search_location(self, chat_id, query):
+        finds, rand_id = self.helper.search_location(query)
+        if finds < 1:
+            self.bot.send_message(
+                chat_id, f'Wenn i nach "{query}" suach find i nix...vielleicht verschriebn?')
+        elif finds == 1:
+            self.helper.approve_location(chat_id, rand_id, 0)
+        elif finds > 1:
+            self.bot.send_message(chat_id, 'Suach da aus wost willst, oda schick ma wos aunders',
+                                  reply_markup=self.helper.search_location_button(rand_id))
 
-The Complete Detail:
-{message}
+    def process_history(self, message):
+        self.bot.send_message(message.chat.id, 'Welche Art von Leistungstag willst da anschaun?',
+                              reply_markup=self.helper.leistungstag_history_type_button())
 
+    def process_purge(self, message):
+        self.bot.send_animation(
+            message.chat.id, 'https://giphy.com/gifs/MCZ39lz83o5lC',
+            caption='Welche Art von Leistungstag willst löschen?',
+            reply_markup=self.helper.leistungstag_purge_type_button())
 
-''')
+    def infinite_poll(self):
+        self.bot.infinity_polling()
 
-        return bot.reply_to(message, f'''An Unexpected Error Occured!
-Error::  {error}
-The error was informed to @eckphi''')
-
-
-@bot.message_handler(commands=['alive'])
-def alive(message):
-    bot.reply_to(
-        message, f'Hey {message.from_user.username}, Ready To Serve You')
-
-
-@bot.message_handler(commands=['start'])
-def start(message):
-    bot.reply_to(
-        message, f'Heya {message.from_user.username}, I am there to help you in polls. But this cmd is bit old try /help.')
-
-
-@bot.message_handler(content_types=['text'])
-def new_msg(message):
-    try:
-        cmd.new_msg(message)
-    except Exception as error:
-        bot.send_message(
-            CHAT_ID, f'Hi Devs!!\nHandle This Error plox\n{error}')
-        bot.reply_to(message, f'An error occurred!\nError: {error}')
-        bot.send_message(CHAT_ID, f'An error occurred!\nError: {error}')
-        bot.send_document(CHAT_ID, '{message}')
-
-
-@bot.message_handler(commands=['sendnudes'])
-def send_nudes(message):
-    try:
-        cmd.new_msg(message)
-    except Exception as error:
-        bot.send_message(
-            CHAT_ID, f'Hi Devs!!\nHandle This Error plox\n{error}')
-        bot.reply_to(message, f'An error occurred!\nError: {error}')
-        bot.send_message(CHAT_ID, f'An error occurred!\nError: {error}')
-        bot.send_document(CHAT_ID, '{message}')
+    def poll(self):
+        self.bot.polling()
 
 
 class GracefulKiller:
@@ -347,7 +505,7 @@ def notify_socket(clean_environment=True):
         return _empty
 
     if address[0] == "@":
-        address = "\0" + address[1:]
+        address = "\0" + str(address[1:])
 
     # SOCK_CLOEXEC was added in Python 3.2 and requires Linux >= 2.6.27.
     # It means "close this socket after fork/exec()
@@ -400,13 +558,6 @@ def systemd_status(address, sock, status):
     return sd_message(address, sock, message)
 
 
-err_count = 0  # Check for errors
-while True:
-    try:
-        bot.polling()
-    except FileNotFoundError as e:
-        print(e)
-        err_count += 1
-        print(f'Error Number: {err_count}')
-        if err_count == 10:
-            break
+if __name__ == '__main__':
+    lb = LeistungsBot()
+    lb.infinite_poll()
