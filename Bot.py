@@ -136,9 +136,9 @@ class LeistungsBot(object):
                         bot.send_message(
                             call.message.chat.id, 'De Nachrichtn muast leida manuell löschen')
                 elif cmd == 'open':
-                    if self.bot.get_state(call.from_user.id, call.message.chat.id) == LeistungsState.remindePoll:
+                    if self.bot.get_state(call.from_user.id, call.message.chat.id) == LeistungsState.remindePoll.name:
                         self.process_reminder(call.message, val)
-                    elif self.bot.get_state(call.from_user.id, call.message.chat.id) == LeistungsState.closePoll:
+                    elif self.bot.get_state(call.from_user.id, call.message.chat.id) == LeistungsState.closePoll.name:
                         self.process_closepoll(call.message, val)
                 else:
                     bot.send_message(
@@ -288,7 +288,7 @@ class LeistungsBot(object):
                     return
 
                 self.bot.set_state(message.from_user.id,
-                                   LeistungsState.pollLocation, message.chat.id)
+                                   LeistungsState.remindePoll, message.chat.id)
                 self.bot.reply_to(message, 'An welchen Poll wüst reminden?',
                                   reply_markup=self.helper.open_polls_button())
             except Exception as error:
@@ -307,7 +307,7 @@ class LeistungsBot(object):
                     return
 
                 self.bot.set_state(message.from_user.id,
-                                   LeistungsState.pollLocation, message.chat.id)
+                                   LeistungsState.closePoll, message.chat.id)
                 self.bot.reply_to(message, 'Welchen Poll wüst closen?',
                                   reply_markup=self.helper.open_polls_button())
             except Exception as error:
@@ -436,7 +436,7 @@ class LeistungsBot(object):
 
         leistungstag = self.helper.db.getLeistungstag(leistungstag_key)
         self.bot.send_message(
-            self.config['leistungschat_id'], 'Reminder. Morgen wird reserviert. Letzte Chance zum Abstimmen 🗳️', reply_to_message_id=leistungstag['poll_id'])
+            config['leistungschat_id'], 'Reminder. Morgen wird reserviert. Letzte Chance zum Abstimmen 🗳️', reply_to_message_id=leistungstag['poll_id'])
         self.bot.send_message(message.chat.id, 'Da Reminder is draußen!')
 
     def process_closepoll(self, message, leistungstag_key):
@@ -447,9 +447,9 @@ class LeistungsBot(object):
 
         leistungstag = self.helper.db.getLeistungstag(leistungstag_key)
         self.bot.stop_poll(
-            self.config['leistungschat_id'], leistungstag['poll_id'])
+            config['leistungschat_id'], leistungstag['poll_id'])
         self.bot.send_message(
-            self.config['leistungschat_id'], 'Schluss, aus, vorbei die Wahl is glaufen und für de de abgstimmt haben is a Platzerl reserviert.', reply_to_message_id=leistungstag['poll_id'])
+            config['leistungschat_id'], 'Schluss, aus, vorbei die Wahl is glaufen und für de de abgstimmt haben is a Platzerl reserviert.', reply_to_message_id=leistungstag['poll_id'])
         self.bot.send_message(
             message.chat.id, 'De Poll is zua. I hoff für dich d Reservierung is scho erledigt!')
 
