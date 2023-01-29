@@ -55,7 +55,7 @@ class Scheduler(object):
         for poll in polls:
             if (datetime.now() + timedelta(days=2)).date() == poll['date']:
                 self.bot.send_message(
-                    self.config['leistungschat_id'], 'Reminder. Übermorgen ises so weit, daun is endlich wieder Leistungstag. Letzte Chance zum Abstimmen 🗳️', reply_to_message_id=poll['poll_id'])
+                    self.config['leistungschat_id'], 'Reminder. Übermorgen ises so weit, daun is endlich wieder Leistungstag.', reply_to_message_id=poll['poll_id'])
 
     def close_poll(self, type: LeistungsTyp = None):
         polls = self.db.getOpenLeistungsTag(type)
