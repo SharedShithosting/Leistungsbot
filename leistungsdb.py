@@ -542,4 +542,6 @@ if __name__ == "__main__":
     # db.addUser(4711)
     #db.addLocation('ChIJ5UvV55IHbUcRMq6el31MzZI', 'Cafe Phönixhof')
     #db.addLeistungsTag(datetime.now(), 'Cafe Phönixhof', 42069)
-    db.addParticipant(4711, 42069)
+    #db.addParticipant(4711, 42069)
+    a = db.getOpenLeistungsTag()
+    print(a)

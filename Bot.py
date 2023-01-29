@@ -288,9 +288,9 @@ class LeistungsBot(object):
                     return
 
                 self.bot.set_state(message.from_user.id,
-                        LeistungsState.pollLocation, message.chat.id)
+                                   LeistungsState.pollLocation, message.chat.id)
                 self.bot.reply_to(message, 'An welchen Poll wüst reminden?',
-                reply_markup=self.helper.open_polls_button())
+                                  reply_markup=self.helper.open_polls_button())
             except Exception as error:
                 bot.send_message(
                     self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
@@ -307,9 +307,9 @@ class LeistungsBot(object):
                     return
 
                 self.bot.set_state(message.from_user.id,
-                        LeistungsState.pollLocation, message.chat.id)
-                self.bot.reply_to(message, 'An welchen Poll wüst closen?',
-                    reply_markup=self.helper.open_polls_button())
+                                   LeistungsState.pollLocation, message.chat.id)
+                self.bot.reply_to(message, 'Welchen Poll wüst closen?',
+                                  reply_markup=self.helper.open_polls_button())
             except Exception as error:
                 bot.send_message(
                     self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
@@ -450,7 +450,8 @@ class LeistungsBot(object):
             self.config['leistungschat_id'], leistungstag['poll_id'])
         self.bot.send_message(
             self.config['leistungschat_id'], 'Schluss, aus, vorbei die Wahl is glaufen und für de de abgstimmt haben is a Platzerl reserviert.', reply_to_message_id=leistungstag['poll_id'])
-        self.bot.send_message(message.chat.id, 'De Poll is zua. I hoff für dich d Reservierung is scho erledigt!')
+        self.bot.send_message(
+            message.chat.id, 'De Poll is zua. I hoff für dich d Reservierung is scho erledigt!')
 
     def process_send_nudes(self, message):
         self.helper.send_nude(message)
