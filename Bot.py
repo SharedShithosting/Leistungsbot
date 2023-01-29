@@ -205,8 +205,7 @@ class LeistungsBot(object):
 
         @bot.message_handler(commands=['help'])
         def helper(message):
-            return bot.reply_to(message, f'''
-        ''')
+            return bot.reply_to(message, f'''Eiso i hüf da do ned...''')
 
         @bot.message_handler(commands=['purge'])
         def purge(message):
@@ -272,11 +271,11 @@ class LeistungsBot(object):
                 bot.reply_to(message, f'An error occurred!\nError: {error}')
                 bot.send_message(
                     self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
-        
+
         @bot.message_handler(commands=['sendreminder'])
         def pollNow(message):
             try:
-                self.process_reminder(message)
+                self.process_sendreminder(message)
             except Exception as error:
                 bot.send_message(
                     self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
@@ -418,7 +417,7 @@ class LeistungsBot(object):
                     self.config['leistungschat_id'], 'Reminder. Morgen wird reserviert. Letzte Chance zum Abstimmen 🗳️', reply_to_message_id=poll['poll_id'])
                 self.bot.send_message(message.chat.id, 'Da Reminder is draußen!',
                             reply_markup=self.helper.location_keyboard())
-    
+
     def process_closepoll(self, message):
         if not self.helper.sender_has_permission(message):
             self.bot.reply_to(
