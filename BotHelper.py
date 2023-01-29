@@ -61,11 +61,19 @@ class Helper(object):
             markup.add(KeyboardButton(location[0]))
         return markup
 
-    def location_button(self):
+    def virgine_location_button(self):
         markup = InlineKeyboardMarkup(row_width=1)
         for location in self.db.getVirgineLocations():
             markup.add(InlineKeyboardButton(
                 location[0], callback_data=json.dumps({'location': location[1]})))
+        return markup
+
+    def open_polls_button(self):
+        markup = InlineKeyboardMarkup(row_width=1)
+        for leistungstag in self.db.getOpenLeistungsTag():
+            markup.add(InlineKeyboardButton(
+                self.db.getLocationName(leistungstag['location']),
+                callback_data=json.dumps({'open': leistungstag['key']})))
         return markup
 
     def search_location(self, query):

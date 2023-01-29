@@ -73,6 +73,8 @@ class LeistungsState(StatesGroup):
     searchLocation = State()
     purgeLeistungstag = State()
     historyLeistungstag = State()
+    remindePoll = State()
+    closePoll = State()
 
 
 class LeistungsBot(object):
@@ -133,6 +135,11 @@ class LeistungsBot(object):
                     else:
                         bot.send_message(
                             call.message.chat.id, 'De Nachrichtn muast leida manuell löschen')
+                elif cmd == 'open':
+                    if self.bot.get_state(call.from_user.id, call.message.chat.id) == LeistungsState.remindePoll:
+                        self.process_reminder(call.message, val)
+                    elif self.bot.get_state(call.from_user.id, call.message.chat.id) == LeistungsState.closePoll:
+                        self.process_closepoll(call.message, val)
                 else:
                     bot.send_message(
                         self.helper.config['chat_id'], f'Hi Devs!!\nHandle this callback\n{cmd}')
@@ -275,7 +282,15 @@ class LeistungsBot(object):
         @bot.message_handler(commands=['sendreminder'])
         def pollNow(message):
             try:
-                self.process_sendreminder(message)
+                if not self.helper.sender_has_permission(message):
+                    self.bot.reply_to(
+                        message, 'Diese Funktion ist nicht für den Pöbel gedacht.')
+                    return
+
+                self.bot.set_state(message.from_user.id,
+                        LeistungsState.pollLocation, message.chat.id)
+                self.bot.reply_to(message, 'An welchen Poll wüst reminden?',
+                reply_markup=self.helper.open_polls_button())
             except Exception as error:
                 bot.send_message(
                     self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
@@ -286,7 +301,15 @@ class LeistungsBot(object):
         @bot.message_handler(commands=['closepoll'])
         def pollNow(message):
             try:
-                self.process_closepoll(message)
+                if not self.helper.sender_has_permission(message):
+                    self.bot.reply_to(
+                        message, 'Diese Funktion ist nicht für den Pöbel gedacht.')
+                    return
+
+                self.bot.set_state(message.from_user.id,
+                        LeistungsState.pollLocation, message.chat.id)
+                self.bot.reply_to(message, 'An welchen Poll wüst closen?',
+                    reply_markup=self.helper.open_polls_button())
             except Exception as error:
                 bot.send_message(
                     self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
@@ -405,33 +428,29 @@ class LeistungsBot(object):
             self.helper.send_leistungstag(message.chat.id, location)
             self.bot.delete_state(message.from_user.id, message.chat.id)
 
-    def process_sendreminder(self, message):
+    def process_reminder(self, message, leistungstag_key):
         if not self.helper.sender_has_permission(message):
             self.bot.reply_to(
                 message, 'Diese Funktion ist nicht für den Pöbel gedacht.')
             return
-        polls = self.db.getOpenLeistungsTag(type)
-        for poll in polls:
-            if (datetime.now() + timedelta(days=1)).date() == poll['date']:
-                self.bot.send_message(
-                    self.config['leistungschat_id'], 'Reminder. Morgen wird reserviert. Letzte Chance zum Abstimmen 🗳️', reply_to_message_id=poll['poll_id'])
-                self.bot.send_message(message.chat.id, 'Da Reminder is draußen!',
-                            reply_markup=self.helper.location_keyboard())
 
-    def process_closepoll(self, message):
+        leistungstag = self.helper.db.getLeistungstag(leistungstag_key)
+        self.bot.send_message(
+            self.config['leistungschat_id'], 'Reminder. Morgen wird reserviert. Letzte Chance zum Abstimmen 🗳️', reply_to_message_id=leistungstag['poll_id'])
+        self.bot.send_message(message.chat.id, 'Da Reminder is draußen!')
+
+    def process_closepoll(self, message, leistungstag_key):
         if not self.helper.sender_has_permission(message):
             self.bot.reply_to(
                 message, 'Diese Funktion ist nicht für den Pöbel gedacht.')
             return
-        polls = self.db.getOpenLeistungsTag(type)
-        for poll in polls:
-            if (datetime.now() + timedelta(days=1)).date() == poll['date']:
-                self.bot.stop_poll(
-                    self.config['leistungschat_id'], poll['poll_id'])
-                self.bot.send_message(
-                    self.config['leistungschat_id'], 'Schluss, aus, vorbei die Wahl is glaufen und für de de abgstimmt haben is a Platzerl reserviert.', reply_to_message_id=poll['poll_id'])
-        self.bot.send_message(message.chat.id, 'De Poll is zua. I hoff für dich d Reservierung is scho erledigt!',
-                              reply_markup=self.helper.location_keyboard())
+
+        leistungstag = self.helper.db.getLeistungstag(leistungstag_key)
+        self.bot.stop_poll(
+            self.config['leistungschat_id'], leistungstag['poll_id'])
+        self.bot.send_message(
+            self.config['leistungschat_id'], 'Schluss, aus, vorbei die Wahl is glaufen und für de de abgstimmt haben is a Platzerl reserviert.', reply_to_message_id=leistungstag['poll_id'])
+        self.bot.send_message(message.chat.id, 'De Poll is zua. I hoff für dich d Reservierung is scho erledigt!')
 
     def process_send_nudes(self, message):
         self.helper.send_nude(message)
