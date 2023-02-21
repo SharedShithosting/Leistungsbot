@@ -320,7 +320,11 @@ class LeistungsBot(object):
         @bot.message_handler(commands=['sendnudes'])
         def send_nudes(message):
             try:
-                self.process_send_nudes(message.chat.id)
+                if message.chat.type != 'private':
+                    bot.reply_to(
+                        message, f'Bist deppad? Des is nix fürn Gruppen chat, du Drecksau.')
+                else:
+                    self.process_send_nudes(message.chat.id)
             except Exception as error:
                 bot.send_message(
                     self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
