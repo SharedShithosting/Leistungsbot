@@ -58,7 +58,7 @@ API_ID = config['api_id']  # YOUR API ID GET FROM my.telegram.org
 CHAT_ID = config['chat_id']  # YOUR PRIVATE GROUP TO VIEW LOGS OR ERROR
 LEISTUNGSCHAT_ID = config['leistungschat_id']
 LEISTUNGSADMIN_ID = config['leistungsadmin_id']
-#LEISTUNGSCHAT_ID = LEISTUNGSADMIN_ID
+# LEISTUNGSCHAT_ID = LEISTUNGSADMIN_ID
 USERNAMES = config['usernames']  # YOUR USERNAME THIS IS MANDTORY
 
 # ABOVE MAIN VARS -------------------------------------------------------------------|
@@ -429,7 +429,8 @@ class LeistungsBot(object):
             self.bot.set_state(message.from_user.id,
                                LeistungsState.searchLocation, message.chat.id)
         elif info['visited']:
-            self.bot.reply_to(message, 'Do woan ma schomoi, suach da wos aunders.')
+            self.bot.reply_to(
+                message, 'Do woan ma schomoi, suach da wos aunders.')
             self.bot.delete_state(message.from_user.id, message.chat.id)
         else:
             self.helper.send_leistungstag(message.chat.id, location)
@@ -453,6 +454,7 @@ class LeistungsBot(object):
             return
 
         leistungstag = self.helper.db.getLeistungstag(leistungstag_key)
+        self.helper.db.closeLeistungstag(leistungstag_key)
         self.bot.stop_poll(
             config['leistungschat_id'], leistungstag['poll_id'])
         self.bot.send_message(
