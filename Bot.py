@@ -428,6 +428,9 @@ class LeistungsBot(object):
                 reply_markup=self.helper.unkown_location_button(location))
             self.bot.set_state(message.from_user.id,
                                LeistungsState.searchLocation, message.chat.id)
+        elif info['visited']:
+            self.bot.reply_to(message, 'Do woan ma schomoi, suach da wos aunders.')
+            self.bot.delete_state(message.from_user.id, message.chat.id)
         else:
             self.helper.send_leistungstag(message.chat.id, location)
             self.bot.delete_state(message.from_user.id, message.chat.id)
