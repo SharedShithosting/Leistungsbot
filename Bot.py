@@ -75,6 +75,7 @@ class LeistungsState(StatesGroup):
     historyLeistungstag = State()
     remindePoll = State()
     closePoll = State()
+    removeLocation = State()
 
 
 class LeistungsBot(object):
@@ -135,6 +136,8 @@ class LeistungsBot(object):
                     else:
                         bot.send_message(
                             call.message.chat.id, 'De Nachrichtn muast leida manuell löschen')
+                elif cmd == 'location':
+                    self.helper.send_location_info2(call.message.chat.id,val)
                 elif cmd == 'open':
                     if self.bot.get_state(call.from_user.id, call.message.chat.id) == LeistungsState.remindePoll.name:
                         self.process_reminder(call.message, val)
@@ -346,10 +349,40 @@ class LeistungsBot(object):
                 bot.send_message(
                     self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
 
+        @bot.message_handler(commands=['remove_location'])
+        def request_location(message):
+            try:
+                if not self.helper.sender_has_permission(message):
+                    self.bot.reply_to(
+                        message, 'Diese Funktion ist nicht für den Pöbel gedacht.')
+                    return
+
+                self.bot.set_state(message.from_user.id,
+                                   LeistungsState.removeLocation, message.chat.id)
+                self.bot.reply_to(message, 'Welche Location willst löschen?',
+                                  reply_markup=self.helper.location_keyboard())
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
+
         @bot.message_handler(commands=['history'])
         def request_location(message):
             try:
                 self.process_history(message)
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
+
+        @bot.message_handler(commands=['show_locations'])
+        def request_location(message):
+            try:
+                bot.reply_to(message,"Des san de nächsten Locations",reply_markup=self.helper.virgine_location_button())
             except Exception as error:
                 bot.send_message(
                     self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
@@ -372,6 +405,19 @@ class LeistungsBot(object):
         def getPollLocation(message):
             try:
                 self.process_poll_location(message)
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
+
+
+        @bot.message_handler(state=LeistungsState.removeLocation)
+        def removeLocation(message):
+            try:
+                self.helper.remove_location(message.text)
+                bot.reply_to(message,"Hab de location murz destroyed!")
             except Exception as error:
                 bot.send_message(
                     self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')

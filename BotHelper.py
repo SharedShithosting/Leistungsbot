@@ -225,6 +225,10 @@ class Helper(object):
         data = self.load_from_rand_file(rand_id)
         self.db.addLocation(data[index]['place_id'], data[index]['name'])
 
+    def remove_location(self,locationname):
+        key = self.db.getLocationKey(locationname)
+        self.db.removeLocation(key)
+
     def publish_leistungstag(self, rand_id):
         vals = self.load_from_rand_file(rand_id)
         self.send_leistungstag(
@@ -256,6 +260,17 @@ class Helper(object):
 {info.get('phone')}
 {info.get('url')}"""
 
+        self.bot.send_message(
+            chat_id, message.replace('.', '\.').replace('=', '\=').replace('+', '\+'), parse_mode='MarkdownV2')
+
+    def send_location_info2(self, chat_id, location_key: int):
+        info = self.db.getLocationInfoByKey(location_key)
+        self.send_location_info(chat_id,info["google-place-id"])
+
+        message = f"""*{info.get('name')}*
+{info.get('address')}
+{info.get('phone')}
+{info.get('url')}"""
         self.bot.send_message(
             chat_id, message.replace('.', '\.').replace('=', '\=').replace('+', '\+'), parse_mode='MarkdownV2')
 

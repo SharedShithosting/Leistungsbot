@@ -14,7 +14,6 @@ class Scheduler(object):
         self.config = yaml.safe_load(open("BotConfig.yml"))
         self.db = LeistungsDB()
         self.schedule = schedule
-        self.schedule.every().day.at('12:00').do(self.close_poll)
         self.schedule.every().day.at('12:00').do(self.send_reminder)
         self.start()
 
@@ -56,15 +55,6 @@ class Scheduler(object):
             if (datetime.now() + timedelta(days=2)).date() == poll['date']:
                 self.bot.send_message(
                     self.config['leistungschat_id'], 'Reminder. Übermorgen ises so weit, daun is endlich wieder Leistungstag.', reply_to_message_id=poll['poll_id'])
-
-    def close_poll(self, type: LeistungsTyp = None):
-        polls = self.db.getOpenLeistungsTag(type)
-        for poll in polls:
-            if (datetime.now() + timedelta(days=1)).date() == poll['date']:
-                self.bot.stop_poll(
-                    self.config['leistungschat_id'], poll['poll_id'])
-                self.bot.send_message(
-                    self.config['leistungschat_id'], 'Schluss, aus, vorbei die Wahl is glaufen', reply_to_message_id=poll['poll_id'])
 
     def send_reservation(self, type: LeistungsTyp = None):
         polls = self.db.getClosedLeistungsTag(type)

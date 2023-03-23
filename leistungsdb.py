@@ -174,6 +174,19 @@ class LeistungsDB(object):
                 name = orig_name + str(cnt)
         self.mydb.commit()
 
+    def removeLocation(self, key):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
+        cursor = self.mydb.cursor()
+        sql = "DELETE FROM `locations` WHERE `key` = %s;"
+        values = (key,)
+        logging.debug(sql % values)
+        cursor.execute(sql, values)
+        self.mydb.commit()
+
     def getAllLocations(self):
         if not self.mydb.is_connected():
             if not self.connect():
