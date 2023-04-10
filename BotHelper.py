@@ -24,7 +24,8 @@ class LeistungsTyp(IntEnum):
 class Helper(object):
     def __init__(self, bot: telebot.TeleBot) -> None:
         self.bot = bot
-        self.config = yaml.safe_load(open("BotConfig.yml"))
+        self.config = yaml.safe_load(
+            open(os.environ.get("LEISTUNGSBOT_CONFIG_FILE", "BotConfig.yml")))
         self.db = LeistungsDB()
         self.temp_dir = tempfile.gettempdir()
         self.google = Places()
@@ -225,7 +226,7 @@ class Helper(object):
         data = self.load_from_rand_file(rand_id)
         self.db.addLocation(data[index]['place_id'], data[index]['name'])
 
-    def remove_location(self,locationname):
+    def remove_location(self, locationname):
         key = self.db.getLocationKey(locationname)
         self.db.removeLocation(key)
 
@@ -265,7 +266,7 @@ class Helper(object):
 
     def send_location_info2(self, chat_id, location_key: int):
         info = self.db.getLocationInfoByKey(location_key)
-        self.send_location_info(chat_id,info["google-place-id"])
+        self.send_location_info(chat_id, info["google-place-id"])
 
         message = f"""*{info.get('name')}*
 {info.get('address')}

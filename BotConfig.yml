@@ -1,5 +1,5 @@
 mysql:
-  host: '10.1.1.111'
+  host: 'mysql'
   db: 'leistungs_db'
   user: 'leistungs_user'
   password: '8JpoPax7TEyGCY'

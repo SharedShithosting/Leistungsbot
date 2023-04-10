@@ -1,10 +1,12 @@
 import googlemaps
 import yaml
+import os
 
 
 class Places:
     def __init__(self) -> None:
-        self.config = yaml.safe_load(open("BotConfig.yml"))
+        self.config = yaml.safe_load(
+            open(os.environ.get("LEISTUNGSBOT_CONFIG_FILE", "BotConfig.yml")))
         self.gmaps = googlemaps.Client(
             key=self.config['google'])
         self.lat = 48.306284
