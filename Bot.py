@@ -210,7 +210,7 @@ class LeistungsBot(object):
                     print('Logs Sent To Owner')
                 else:
                     bot.reply_to(
-                        message, f'Sorry {message.from_user.username}! You Are Not Allowed For This Command,')
+                        message, f'Sorry {message.from_user.username}! You Are Not Allowed For This Command.')
             except Exception as error:
                 bot.reply_to(message, f'Error: {error}')
 
@@ -433,7 +433,7 @@ class LeistungsBot(object):
                     message.chat.id, message.text.strip())
             except Exception as error:
                 bot.send_message(
-                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error (LeistungsState.searchLocation)\n{error}')
                 bot.reply_to(message, f'An error occurred!\nError: {error}')
                 bot.send_message(
                     self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
@@ -445,10 +445,8 @@ class LeistungsBot(object):
                     self.process_send_nudes(message.chat.id)
             except Exception as error:
                 bot.send_message(
-                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error (text)\n{error}')
                 bot.reply_to(message, f'An error occurred!\nError: {error}')
-                bot.send_message(
-                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
 
     def process_cancle(self, message):
         self.bot.send_message(message.chat.id, "Halt Stop.",
