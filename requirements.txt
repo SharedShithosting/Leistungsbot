@@ -9,3 +9,4 @@ urllib3
 googlemaps
 pyyaml
 schedule
+python-telegram-bot-calendar

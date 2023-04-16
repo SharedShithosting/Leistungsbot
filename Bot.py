@@ -13,9 +13,10 @@ import json
 import os
 import socket
 import random
-from BotHelper import Helper, LeistungsTyp
+from BotHelper import Helper, LeistungsTyp, PersistantLeistungsTagPoller
 from BotScheduler import Scheduler
 import yaml
+from telegram_bot_calendar import DetailedTelegramCalendar, LSTEP
 from telebot import custom_filters
 from telebot.handler_backends import State, StatesGroup  # States
 # States storage
@@ -71,6 +72,8 @@ USERNAMES = config['usernames']  # YOUR USERNAME THIS IS MANDTORY
 class LeistungsState(StatesGroup):
     # Just name variables differently
     pollLocation = State()  # creating instances of State class is enough from now
+    konkurrenzLocation = State()
+    zusatzLocation = State()
     searchLocation = State()
     purgeLeistungstag = State()
     historyLeistungstag = State()
@@ -85,8 +88,31 @@ class LeistungsBot(object):
         self.bot.add_custom_filter(custom_filters.StateFilter(self.bot))
         self.helper = Helper(self.bot)
         self.scheduler = Scheduler(self.bot)
+        self.poller = None
 
-        @bot.callback_query_handler(func=lambda call: True)
+        @bot.callback_query_handler(func=DetailedTelegramCalendar.func())
+        def cal(c):
+            result, key, step = DetailedTelegramCalendar().process(c.data)
+            if not result and key:
+                self.helper.bot.edit_message_text(f"Select {LSTEP[step]}",
+                                                  c.message.chat.id,
+                                                  c.message.message_id,
+                                                  reply_markup=key)
+            elif result:
+                self.helper.bot.edit_message_text(f"You selected {result}",
+                                                  c.message.chat.id,
+                                                  c.message.message_id)
+                if not self.poller:
+                    self.helper.bot.send_message(
+                        c.message.chat_id, "Da is wohl was schiefglaufen, i kann ka poll findn...")
+                    return
+                if self.poller.type == LeistungsTyp.NORMAL and result.weekday() != 1:
+                    self.helper.bot.send_message(
+                        c.message.chat_id, "Blasphemie, des is ka Dienstag wast da du do ausgsuacht hast...alles auf eigene Gefahr!", )
+
+                self.poller.dry_send_with_date(result)
+
+        @bot.callback_query_handler(func=lambda call: not DetailedTelegramCalendar.func())
         def callback_query(call):
             try:
                 data = json.loads(call.data)
@@ -275,7 +301,50 @@ class LeistungsBot(object):
         @bot.message_handler(commands=['leistungspoll'])
         def pollNow(message):
             try:
-                self.process_leistungspoll(message)
+                if not self.helper.sender_has_permission(message):
+                    self.bot.reply_to(
+                        message, 'Diese Funktion ist nicht für den Pöbel gedacht.')
+                    return
+                self.bot.set_state(message.from_user.id,
+                                   LeistungsState.pollLocation, message.chat.id)
+                self.bot.send_message(message.chat.id, 'Schick de nexte location muaz',
+                                      reply_markup=self.helper.location_keyboard())
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
+
+        @bot.message_handler(commands=['zusatzpoll'])
+        def pollNow(message):
+            try:
+                if not self.helper.sender_has_permission(message):
+                    self.bot.reply_to(
+                        message, 'Diese Funktion ist nicht für den Pöbel gedacht.')
+                    return
+                self.bot.set_state(message.from_user.id,
+                                   LeistungsState.zusatzLocation, message.chat.id)
+                self.bot.send_message(message.chat.id, 'Schick de nexte location muaz',
+                                      reply_markup=self.helper.location_keyboard())
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
+
+        @bot.message_handler(commands=['konkurrenzpoll'])
+        def pollNow(message):
+            try:
+                if not self.helper.sender_has_permission(message):
+                    self.bot.reply_to(
+                        message, 'Diese Funktion ist nicht für den Pöbel gedacht.')
+                    return
+                self.bot.set_state(message.from_user.id,
+                                   LeistungsState.konkurrenzLocation, message.chat.id)
+                self.bot.send_message(message.chat.id, 'Schick de nexte location muaz',
+                                      reply_markup=self.helper.location_keyboard())
             except Exception as error:
                 bot.send_message(
                     self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
@@ -406,7 +475,41 @@ class LeistungsBot(object):
         @bot.message_handler(state=LeistungsState.pollLocation)
         def getPollLocation(message):
             try:
-                self.process_poll_location(message)
+                location = self.process_poll_location(message)
+                if location:
+                    self.poller = PersistantLeistungsTagPoller(
+                        self.helper, message.chat.id, location, LeistungsTyp.NORMAL)
+                    self.helper.pick_date(message.chat.id)
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
+
+        @bot.message_handler(state=LeistungsState.konkurrenzLocation)
+        def getPollLocation(message):
+            try:
+                location = self.process_poll_location(message)
+                if location:
+                    self.poller = PersistantLeistungsTagPoller(
+                        self.helper, message.chat.id, location, LeistungsTyp.KONKURENZ)
+                    self.helper.pick_date(message.chat.id)
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
+
+        @bot.message_handler(state=LeistungsState.zusatzLocation)
+        def getPollLocation(message):
+            try:
+                location = self.process_poll_location(message)
+                if location:
+                    self.poller = PersistantLeistungsTagPoller(
+                        self.helper, message.chat.id, location, LeistungsTyp.ZUSATZ)
+                    self.helper.pick_date(message.chat.id)
             except Exception as error:
                 bot.send_message(
                     self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
@@ -453,16 +556,6 @@ class LeistungsBot(object):
                               reply_markup=telebot.types.ReplyKeyboardRemove())
         self.bot.delete_state(message.from_user.id, message.chat.id)
 
-    def process_leistungspoll(self, message):
-        if not self.helper.sender_has_permission(message):
-            self.bot.reply_to(
-                message, 'Diese Funktion ist nicht für den Pöbel gedacht.')
-            return
-        self.bot.set_state(message.from_user.id,
-                           LeistungsState.pollLocation, message.chat.id)
-        self.bot.send_message(message.chat.id, 'Schick de nexte location muaz',
-                              reply_markup=self.helper.location_keyboard())
-
     def process_poll_location(self, message):
         location = message.text.strip()
         # check if location exists in database
@@ -478,8 +571,9 @@ class LeistungsBot(object):
                 message, 'Do woan ma schomoi, suach da wos aunders.')
             self.bot.delete_state(message.from_user.id, message.chat.id)
         else:
-            self.helper.send_leistungstag(message.chat.id, location)
             self.bot.delete_state(message.from_user.id, message.chat.id)
+            return location
+        return None
 
     def process_reminder(self, message, leistungstag_key):
         if not self.helper.sender_has_permission(message):

@@ -13,6 +13,7 @@ import tempfile
 import os
 import pickle
 import random
+from telegram_bot_calendar import DetailedTelegramCalendar, LSTEP
 
 
 class LeistungsTyp(IntEnum):
@@ -116,6 +117,9 @@ class Helper(object):
                 InlineKeyboardButton(
                     i.name, callback_data=json.dumps({key: i})))
         return markup
+
+    def leistungstag_poll_type_button(self):
+        return self.leistungstag_type_button('poll_type')
 
     def leistungstag_history_type_button(self):
         return self.leistungstag_type_button('history_type')
@@ -335,3 +339,26 @@ The Complete Detail:
         return self.bot.reply_to(self.message, f'''An Unexpected Error Occured!
 Error::  {error}
 The error was informed to @eckphi''')
+
+    def pick_date(self, chat_id):
+        calendar, step = DetailedTelegramCalendar().build()
+        self.bot.send_message(chat_id,
+                              f"Select {LSTEP[step]}",
+                              reply_markup=calendar)
+
+
+class PersistantLeistungsTagPoller():
+    def __init__(self, helper: Helper, chat_id, location: str, type: LeistungsTyp = LeistungsTyp.NORMAL, date: datetime = None):
+        self.chat_id = chat_id
+        self.location = location
+        self.type = type
+        self.date = date
+        self.helper = helper
+
+    def dry_send_with_date(self, date: datetime):
+        self.helper.send_leistungstag(
+            self.chat_id, self.location, self.type, date, True)
+
+    def dry_send(self):
+        self.helper.send_leistungstag(
+            self.chat_id, self.location, self.type, self.date, True)
