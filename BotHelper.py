@@ -24,10 +24,14 @@ class LeistungsTyp(IntEnum):
 class Helper(object):
     def __init__(self, bot: telebot.TeleBot) -> None:
         self.bot = bot
-        self.config = yaml.safe_load(open("BotConfig.yml"))
+        self.config = yaml.safe_load(
+            open(os.environ.get("LEISTUNGSBOT_CONFIG_FILE", "BotConfig.yml")))
         self.db = LeistungsDB()
         self.temp_dir = tempfile.gettempdir()
         self.google = Places()
+
+    def escape_markdown(self, text: str, markdown_version: int = 2):
+        return telebot.formatting.escape_markdown(text)
 
     def get_full_temp_file(self, file_id: str):
         return os.path.join(self.temp_dir, str(file_id) + '_leistung')
@@ -225,7 +229,7 @@ class Helper(object):
         data = self.load_from_rand_file(rand_id)
         self.db.addLocation(data[index]['place_id'], data[index]['name'])
 
-    def remove_location(self,locationname):
+    def remove_location(self, locationname):
         key = self.db.getLocationKey(locationname)
         self.db.removeLocation(key)
 
@@ -253,41 +257,41 @@ class Helper(object):
         info = self.db.getLocationInfoByKey(ld['location'])
         rating = self.db.getAvgLocationRating(info['name'])
 
-        message = f"""*{info.get('name')}*
+        message = f"""*{self.escape_markdown(info.get('name'))}*""" + self.escape_markdown(f"""
 {ld['date'].strftime('%d.%m.%Y')}
 {self.get_stars(rating)}
 {info.get('address')}
 {info.get('phone')}
-{info.get('url')}"""
+{info.get('url')}""")
 
         self.bot.send_message(
-            chat_id, message.replace('.', '\.').replace('=', '\=').replace('+', '\+'), parse_mode='MarkdownV2')
+            chat_id, message, parse_mode='MarkdownV2')
 
     def send_location_info2(self, chat_id, location_key: int):
         info = self.db.getLocationInfoByKey(location_key)
-        self.send_location_info(chat_id,info["google-place-id"])
+        self.send_location_info(chat_id, info["google-place-id"])
 
-        message = f"""*{info.get('name')}*
+        message = f"""*{self.escape_markdown(info.get('name'))}*""" + self.escape_markdown(f"""
 {info.get('address')}
 {info.get('phone')}
-{info.get('url')}"""
+{info.get('url')}""")
         self.bot.send_message(
-            chat_id, message.replace('.', '\.').replace('=', '\=').replace('+', '\+'), parse_mode='MarkdownV2')
+            chat_id, message, parse_mode='MarkdownV2')
 
     def send_purge_info(self, chat_id, leistungstag_key: int):
         ld = self.db.getLeistungstag(leistungstag_key)
         info = self.db.getLocationInfoByKey(ld['location'])
         rating = self.db.getAvgLocationRating(info['name'])
 
-        message = f"""*{info.get('name')}*
+        message = f"""*{self.escape_markdown(info.get('name'))}*""" + self.escape_markdown(f"""
 {ld['date'].strftime('%d.%m.%Y')}
 {self.get_stars(rating)}
 {info.get('address')}
 {info.get('phone')}
-{info.get('url')}"""
+{info.get('url')}""")
 
         self.bot.send_message(
-            chat_id, message.replace('.', '\.').replace('=', '\=').replace('+', '\+'), parse_mode='MarkdownV2', reply_markup=self.leistungstag_purge_button(leistungstag_key))
+            chat_id, message, parse_mode='MarkdownV2', reply_markup=self.leistungstag_purge_button(leistungstag_key))
 
     def purge_leistungstag(self, leistungstag_key: int):
         ld = self.db.getLeistungstag(leistungstag_key)

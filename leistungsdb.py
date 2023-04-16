@@ -5,12 +5,14 @@ import logging
 from google_place import Places
 import yaml
 import re
+import os
 
 
 class LeistungsDB(object):
     def __init__(self):
         self.google = Places()
-        self.config = yaml.safe_load(open("BotConfig.yml"))
+        self.config = yaml.safe_load(
+            open(os.environ.get("LEISTUNGSBOT_CONFIG_FILE", "BotConfig.yml")))
         self.connect()
 
     def connect(self):
@@ -553,8 +555,8 @@ if __name__ == "__main__":
     db = LeistungsDB()
     db.checkConnection()
     # db.addUser(4711)
-    #db.addLocation('ChIJ5UvV55IHbUcRMq6el31MzZI', 'Cafe Phönixhof')
-    #db.addLeistungsTag(datetime.now(), 'Cafe Phönixhof', 42069)
-    #db.addParticipant(4711, 42069)
+    # db.addLocation('ChIJ5UvV55IHbUcRMq6el31MzZI', 'Cafe Phönixhof')
+    # db.addLeistungsTag(datetime.now(), 'Cafe Phönixhof', 42069)
+    # db.addParticipant(4711, 42069)
     a = db.getOpenLeistungsTag()
     print(a)

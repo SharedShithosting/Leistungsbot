@@ -6,12 +6,14 @@ import schedule
 import yaml
 from leistungsdb import LeistungsDB
 from BotHelper import LeistungsTyp
+import os
 
 
 class Scheduler(object):
     def __init__(self, bot: telebot.TeleBot) -> None:
         self.bot = bot
-        self.config = yaml.safe_load(open("BotConfig.yml"))
+        self.config = yaml.safe_load(
+            open(os.environ.get("LEISTUNGSBOT_CONFIG_FILE", "BotConfig.yml")))
         self.db = LeistungsDB()
         self.schedule = schedule
         self.schedule.every().day.at('12:00').do(self.send_reminder)
@@ -69,7 +71,8 @@ class Scheduler(object):
 
 
 if __name__ == '__main__':
-    config = yaml.safe_load(open("BotConfig.yml"))
+    config = yaml.safe_load(
+        open(os.environ.get("LEISTUNGSBOT_CONFIG_FILE", "BotConfig.yml")))
     s = Scheduler(telebot.TeleBot(config['bot_token']))
     s.schedule.every().second.do(p)
     time.sleep(5)

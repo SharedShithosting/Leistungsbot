@@ -50,7 +50,8 @@ Developer Commands: #NOTE: ONLY @eckphi is
 '''
 THESE ARE THE IMPORTANT VARS FOR POLL BOT
 '''
-config = yaml.safe_load(open("BotConfig.yml"))
+config = yaml.safe_load(
+    open(os.environ.get("LEISTUNGSBOT_CONFIG_FILE", "BotConfig.yml")))
 BOT_TOKEN = config['bot_token']
 # YOUR API HASH GET FROM my.telegram.org
 API_HASH = config['api_hash']
@@ -137,7 +138,7 @@ class LeistungsBot(object):
                         bot.send_message(
                             call.message.chat.id, 'De Nachrichtn muast leida manuell löschen')
                 elif cmd == 'location':
-                    self.helper.send_location_info2(call.message.chat.id,val)
+                    self.helper.send_location_info2(call.message.chat.id, val)
                 elif cmd == 'open':
                     if self.bot.get_state(call.from_user.id, call.message.chat.id) == LeistungsState.remindePoll.name:
                         self.process_reminder(call.message, val)
@@ -209,7 +210,7 @@ class LeistungsBot(object):
                     print('Logs Sent To Owner')
                 else:
                     bot.reply_to(
-                        message, f'Sorry {message.from_user.username}! You Are Not Allowed For This Command,')
+                        message, f'Sorry {message.from_user.username}! You Are Not Allowed For This Command.')
             except Exception as error:
                 bot.reply_to(message, f'Error: {error}')
 
@@ -382,7 +383,8 @@ class LeistungsBot(object):
         @bot.message_handler(commands=['show_locations'])
         def request_location(message):
             try:
-                bot.reply_to(message,"Des san de nächsten Locations",reply_markup=self.helper.virgine_location_button())
+                bot.reply_to(message, "Des san de nächsten Locations",
+                             reply_markup=self.helper.virgine_location_button())
             except Exception as error:
                 bot.send_message(
                     self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
@@ -412,12 +414,11 @@ class LeistungsBot(object):
                 bot.send_message(
                     self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
 
-
         @bot.message_handler(state=LeistungsState.removeLocation)
         def removeLocation(message):
             try:
                 self.helper.remove_location(message.text)
-                bot.reply_to(message,"Hab de location murz destroyed!")
+                bot.reply_to(message, "Hab de location murz destroyed!")
             except Exception as error:
                 bot.send_message(
                     self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
@@ -432,7 +433,7 @@ class LeistungsBot(object):
                     message.chat.id, message.text.strip())
             except Exception as error:
                 bot.send_message(
-                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error (LeistungsState.searchLocation)\n{error}')
                 bot.reply_to(message, f'An error occurred!\nError: {error}')
                 bot.send_message(
                     self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
@@ -444,10 +445,8 @@ class LeistungsBot(object):
                     self.process_send_nudes(message.chat.id)
             except Exception as error:
                 bot.send_message(
-                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error (text)\n{error}')
                 bot.reply_to(message, f'An error occurred!\nError: {error}')
-                bot.send_message(
-                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
 
     def process_cancle(self, message):
         self.bot.send_message(message.chat.id, "Halt Stop.",
