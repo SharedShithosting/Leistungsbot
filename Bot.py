@@ -41,6 +41,8 @@ User Available Commands:
     11. /show_locations
     12. /remove_location
     13. /location_info
+    14. /zusatzpoll
+    15. /konkurrenzpoll
 
 Developer Commands: #NOTE: ONLY @eckphi is
  allowed for these comands:
@@ -91,28 +93,28 @@ class LeistungsBot(object):
         self.poller = None
 
         @bot.callback_query_handler(func=DetailedTelegramCalendar.func())
-        def cal(c):
-            result, key, step = DetailedTelegramCalendar().process(c.data)
+        def cal(call):
+            result, key, step = DetailedTelegramCalendar().process(call.data)
             if not result and key:
                 self.helper.bot.edit_message_text(f"Select {LSTEP[step]}",
-                                                  c.message.chat.id,
-                                                  c.message.message_id,
+                                                  call.message.chat.id,
+                                                  call.message.message_id,
                                                   reply_markup=key)
             elif result:
                 self.helper.bot.edit_message_text(f"You selected {result}",
-                                                  c.message.chat.id,
-                                                  c.message.message_id)
+                                                  call.message.chat.id,
+                                                  call.message.message_id)
                 if not self.poller:
                     self.helper.bot.send_message(
-                        c.message.chat_id, "Da is wohl was schiefglaufen, i kann ka poll findn...")
+                        call.message.chat_id, "Da is wohl was schiefglaufen, i kann ka poll findn...")
                     return
-                if self.poller.type == LeistungsTyp.NORMAL and result.weekday() != 1:
+                if (self.poller.type == LeistungsTyp.NORMAL or self.poller.type == LeistungsTyp.KONKURENZ) and result.weekday() != 1:
                     self.helper.bot.send_message(
-                        c.message.chat_id, "Blasphemie, des is ka Dienstag wast da du do ausgsuacht hast...alles auf eigene Gefahr!", )
+                        call.message.chat_id, "Blasphemie, des is ka Dienstag wast da du do ausgsuacht hast...alles auf eigene Gefahr!", )
 
                 self.poller.dry_send_with_date(result)
 
-        @bot.callback_query_handler(func=lambda call: not DetailedTelegramCalendar.func())
+        @bot.callback_query_handler(func=self.helper.filter())
         def callback_query(call):
             try:
                 data = json.loads(call.data)
@@ -120,7 +122,7 @@ class LeistungsBot(object):
                     bot.answer_callback_query(
                         call.id, 'SHHEEEEESH des hod ned funktioniert')
                     return
-                cmd = [*data][0]
+                cmd = [*data][0].replace('🍻', '')
                 val = [*data.values()][0]
                 bot.answer_callback_query(call.id, 'Copy that')
                 if cmd == 'search':

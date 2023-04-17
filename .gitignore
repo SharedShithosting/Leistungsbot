@@ -125,3 +125,4 @@ dmypy.json
 
 # config
 BotConfig.yml
+example_db/
