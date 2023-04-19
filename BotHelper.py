@@ -33,10 +33,13 @@ class Helper(object):
 
     def filter(self):
         def inn(callback):
-            data = json.loads(callback.data)
-            cmd = [*data][0]
-            start = "🍻"
-            return cmd.startswith("🍻")
+            try:
+                data = json.loads(callback.data)
+                cmd = [*data][0]
+                start = "🍻"
+                return cmd.startswith("🍻")
+            except:
+                return False
 
     def escape_markdown(self, text: str, markdown_version: int = 2):
         return telebot.formatting.escape_markdown(text)

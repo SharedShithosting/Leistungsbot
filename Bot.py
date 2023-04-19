@@ -73,7 +73,7 @@ USERNAMES = config['usernames']  # YOUR USERNAME THIS IS MANDTORY
 
 class LeistungsState(StatesGroup):
     # Just name variables differently
-    pollLocation = State()  # creating instances of State class is enough from now
+    normalLocation = State()  # creating instances of State class is enough from now
     konkurrenzLocation = State()
     zusatzLocation = State()
     searchLocation = State()
@@ -308,7 +308,7 @@ class LeistungsBot(object):
                         message, 'Diese Funktion ist nicht für den Pöbel gedacht.')
                     return
                 self.bot.set_state(message.from_user.id,
-                                   LeistungsState.pollLocation, message.chat.id)
+                                   LeistungsState.normalLocation, message.chat.id)
                 self.bot.send_message(message.chat.id, 'Schick de nexte location muaz',
                                       reply_markup=self.helper.location_keyboard())
             except Exception as error:
@@ -474,14 +474,12 @@ class LeistungsBot(object):
                 bot.send_message(
                     self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
 
-        @bot.message_handler(state=LeistungsState.pollLocation)
+        @bot.message_handler(state=LeistungsState.normalLocation)
         def getPollLocation(message):
             try:
                 location = self.process_poll_location(message)
                 if location:
-                    self.poller = PersistantLeistungsTagPoller(
-                        self.helper, message.chat.id, location, LeistungsTyp.NORMAL)
-                    self.helper.pick_date(message.chat.id)
+                    self.helper.send_leistungstag(message.chat.id, location)
             except Exception as error:
                 bot.send_message(
                     self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
