@@ -13,6 +13,7 @@ import tempfile
 import os
 import pickle
 import random
+from telegram_bot_calendar import DetailedTelegramCalendar, LSTEP
 
 
 class LeistungsTyp(IntEnum):
@@ -29,6 +30,16 @@ class Helper(object):
         self.db = LeistungsDB()
         self.temp_dir = tempfile.gettempdir()
         self.google = Places()
+
+    def filter(self):
+        def inn(callback):
+            try:
+                data = json.loads(callback.data)
+                cmd = [*data][0]
+                start = "🍻"
+                return cmd.startswith("🍻")
+            except:
+                return False
 
     def escape_markdown(self, text: str, markdown_version: int = 2):
         return telebot.formatting.escape_markdown(text)
@@ -69,7 +80,7 @@ class Helper(object):
         markup = InlineKeyboardMarkup(row_width=1)
         for location in self.db.getVirgineLocations():
             markup.add(InlineKeyboardButton(
-                location[0], callback_data=json.dumps({'location': location[1]})))
+                location[0], callback_data=json.dumps({'🍻location': location[1]})))
         return markup
 
     def open_polls_button(self):
@@ -77,7 +88,7 @@ class Helper(object):
         for leistungstag in self.db.getOpenLeistungsTag():
             markup.add(InlineKeyboardButton(
                 self.db.getLocationName(leistungstag['location']),
-                callback_data=json.dumps({'open': leistungstag['key']})))
+                callback_data=json.dumps({'🍻open': leistungstag['key']})))
         return markup
 
     def search_location(self, query):
@@ -89,7 +100,7 @@ class Helper(object):
         markup = InlineKeyboardMarkup(row_width=1)
         for i in range(len(g_places)):
             markup.add(InlineKeyboardButton(
-                g_places[i]['name'], callback_data=json.dumps({'search': (rand_id, i)})))
+                g_places[i]['name'], callback_data=json.dumps({'🍻search': (rand_id, i)})))
         return markup
 
     def restore_search_location_button(self, rand_id):
@@ -97,16 +108,16 @@ class Helper(object):
         g = self.peak_from_rand_file(rand_id)
         for i in range(len(g)):
             markup.add(InlineKeyboardButton(
-                g[i]['name'], callback_data=json.dumps({'search': (rand_id, i)})))
+                g[i]['name'], callback_data=json.dumps({'🍻search': (rand_id, i)})))
         return markup
 
     def approve_location_button(self, rand_id, index):
         markup = InlineKeyboardMarkup(row_width=1, )
         markup.add(
             InlineKeyboardButton(
-                'Ned mei location', callback_data=json.dumps({'select': (rand_id, -1)})),
+                'Ned mei location', callback_data=json.dumps({'🍻select': (rand_id, -1)})),
             InlineKeyboardButton('Des is mei location', callback_data=json.dumps(
-                {'select': (rand_id, index)})))
+                {'🍻select': (rand_id, index)})))
         return markup
 
     def leistungstag_type_button(self, key: str):
@@ -117,11 +128,14 @@ class Helper(object):
                     i.name, callback_data=json.dumps({key: i})))
         return markup
 
+    def leistungstag_poll_type_button(self):
+        return self.leistungstag_type_button('🍻poll_type')
+
     def leistungstag_history_type_button(self):
-        return self.leistungstag_type_button('history_type')
+        return self.leistungstag_type_button('🍻history_type')
 
     def leistungstag_purge_type_button(self):
-        return self.leistungstag_type_button('purge_type')
+        return self.leistungstag_type_button('🍻purge_type')
 
     def leistungstag_button(self, key: str, type: int):
         history = self.db.getHistory(type)
@@ -134,36 +148,36 @@ class Helper(object):
         return markup
 
     def leistungstag_history_button(self, type):
-        return self.leistungstag_button('history', type)
+        return self.leistungstag_button('🍻history', type)
 
     def leistungstag_dry_purge_button(self, type):
-        return self.leistungstag_button('dry_purge', type)
+        return self.leistungstag_button('🍻dry_purge', type)
 
     def leistungstag_purge_button(self, key):
         markup = InlineKeyboardMarkup(row_width=2, )
         markup.add(
             InlineKeyboardButton(
-                'Des mochn ma ned!', callback_data=json.dumps({'cancle': None})),
+                'Des mochn ma ned!', callback_data=json.dumps({'🍻cancle': None})),
             InlineKeyboardButton('Weg damit', callback_data=json.dumps(
-                {'purge': key})))
+                {'🍻purge': key})))
         return markup
 
     def unkown_location_button(self, location):
         markup = InlineKeyboardMarkup(row_width=2, )
         markup.add(
             InlineKeyboardButton(
-                'Na', callback_data=json.dumps({'cancle': None})),
+                'Na', callback_data=json.dumps({'🍻cancle': None})),
             InlineKeyboardButton('Jo', callback_data=json.dumps(
-                {'q': location})))
+                {'🍻q': location})))
         return markup
 
     def dry_run_button(self, rand_id):
         markup = InlineKeyboardMarkup(row_width=2, )
         markup.add(
             InlineKeyboardButton(
-                'Na', callback_data=json.dumps({'cancle': None})),
+                'Na', callback_data=json.dumps({'🍻cancle': None})),
             InlineKeyboardButton('Jo', callback_data=json.dumps(
-                {'publish': rand_id})))
+                {'🍻publish': rand_id})))
         return markup
 
     def sender_has_permission(self, msg):
@@ -335,3 +349,26 @@ The Complete Detail:
         return self.bot.reply_to(self.message, f'''An Unexpected Error Occured!
 Error::  {error}
 The error was informed to @eckphi''')
+
+    def pick_date(self, chat_id):
+        calendar, step = DetailedTelegramCalendar().build()
+        self.bot.send_message(chat_id,
+                              f"Select {LSTEP[step]}",
+                              reply_markup=calendar)
+
+
+class PersistantLeistungsTagPoller():
+    def __init__(self, helper: Helper, chat_id, location: str, type: LeistungsTyp = LeistungsTyp.NORMAL, date: datetime = None):
+        self.chat_id = chat_id
+        self.location = location
+        self.type = type
+        self.date = date
+        self.helper = helper
+
+    def dry_send_with_date(self, date: datetime):
+        self.helper.send_leistungstag(
+            self.chat_id, self.location, self.type, date, True)
+
+    def dry_send(self):
+        self.helper.send_leistungstag(
+            self.chat_id, self.location, self.type, self.date, True)
