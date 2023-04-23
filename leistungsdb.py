@@ -3,9 +3,16 @@ from mysql.connector import errorcode
 from datetime import datetime
 import logging
 from google_place import Places
+from enum import Enum
 import yaml
 import re
 import os
+
+
+class LeistungsTagState(Enum):
+    NONE = 0
+    OPEN = 1
+    CLOSED = 2
 
 
 class LeistungsDB(object):
@@ -321,6 +328,21 @@ class LeistungsDB(object):
         cursor.execute(sql, values)
         self.mydb.commit()
 
+    def rateLocationKey(self, location_key, user_id, rating):
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
+        uKey = self.getUserKey(user_id)
+        lKey = location_key
+        cursor = self.mydb.cursor()
+        sql = "INSERT INTO `location_rating` (`location`, `member`, `rating`) VALUES (%s, %s, %s);"
+        values = (lKey, uKey, rating,)
+        logging.debug(sql % values)
+        cursor.execute(sql, values)
+        self.mydb.commit()
+
     def getAvgLocationRating(self, location_name):
         if not self.mydb.is_connected():
             if not self.connect():
@@ -500,22 +522,54 @@ class LeistungsDB(object):
         cursor.execute(sql, values)
         return self.convert(cursor.fetchone(), True)
 
-    def getLatest(self, type: int = None):
+    def getLatest(self, type: int = None, state=LeistungsTagState.NONE):
+        return self.getPrevious(type, state, 1)
+
+    def getLeistungsTags(self, type: int = None, state=LeistungsTagState.NONE, max_results: int = 0, before: datetime = None):
         if not self.mydb.is_connected():
             if not self.connect():
                 logging.error("No connection to DataBase possible")
                 raise Exception("No connection to DataBase available")
 
         cursor = self.mydb.cursor(dictionary=True)
+        select = "SELECT * FROM `leistungstag`"
+        where = ""
+        values = ()
+        order = "ORDER BY `date` DESC"
+
+        if before:
+            if len(where) > 0:
+                where += " AND "
+            else:
+                where = "WHERE "
+            where += "`date` <= %s"
+            values += (before,)
+
         if type:
-            sql = "SELECT * FROM `leistungstag` WHERE `type` = %s ORDER BY `date` DESC LIMIT 1;"
-            values = (int(type),)
-        else:
-            sql = "SELECT * FROM `leistungstag` ORDER BY `date` DESC LIMIT 1;"
-            values = ()
+            if len(where) > 0:
+                where += " AND "
+            else:
+                where = "WHERE "
+            where += "`type` = %s"
+            values += (int(type),)
+
+        if state != LeistungsTagState.NONE:
+            if len(where) > 0:
+                where += " AND "
+            else:
+                where = "WHERE "
+            where += "`closed` = %s"
+            values += (state == LeistungsTagState.CLOSED, )
+
+        limit = ""
+        if max_results > 0:
+            limit = "LIMIT %s"
+            values += (max_results, )
+
+        sql = f"{select} {where} {order} {limit};"
         logging.debug(sql % values)
         cursor.execute(sql, values)
-        return self.convert(cursor.fetchone(), True)
+        return self.convert(cursor.fetchall())
 
     def getParticipants(self, leistungstag_key: int):
         if not self.mydb.is_connected():

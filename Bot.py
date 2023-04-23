@@ -82,6 +82,7 @@ class LeistungsState(StatesGroup):
     remindePoll = State()
     closePoll = State()
     removeLocation = State()
+    rateLocation = State()
 
 
 class LeistungsBot(object):
@@ -451,6 +452,28 @@ class LeistungsBot(object):
                 bot.send_message(
                     self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
 
+        @bot.message_handler(commands=['rate_location'])
+        def request_location(message):
+            try:
+                if message.chat.type != 'private':
+                    self.helper.bot.reply_to(
+                        message, "Und wenn ma des ned im Gruppenchat machen, du Nervensäge?")
+                else:
+                    leistungstag = self.helper.db.getLeistungsTags(
+                        LeistungsTyp.NORMAL, max_results=1, before=datetime.now())[0]
+                    self.helper.send_location_info2(
+                        message.chat.id, leistungstag['location'])
+                    self.helper.bot.send_message(
+                        message.chat.id, "Wiafü Monde wüst erm geben?", reply_markup=self.helper.rating_keyboard())
+                    self.bot.set_state(message.from_user.id,
+                                       LeistungsState.rateLocation, message.chat.id)
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
+
         @bot.message_handler(commands=['show_locations'])
         def request_location(message):
             try:
@@ -534,6 +557,27 @@ class LeistungsBot(object):
             try:
                 self.process_search_location(
                     message.chat.id, message.text.strip())
+            except Exception as error:
+                bot.send_message(
+                    self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error (LeistungsState.searchLocation)\n{error}')
+                bot.reply_to(message, f'An error occurred!\nError: {error}')
+                bot.send_message(
+                    self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
+
+        @bot.message_handler(state=LeistungsState.rateLocation)
+        def search_location(message):
+            try:
+                rating = self.helper.get_rating(message.text)
+                leistungstag = self.helper.db.getLeistungsTags(
+                    LeistungsTyp.NORMAL, max_results=1, before=datetime.now())[0]
+                self.helper.db.addUser(message.from_user.id, message.chat.id)
+                try:
+                    self.helper.db.rateLocationKey(
+                        leistungstag['location'], message.from_user.id, rating)
+                except:
+                    self.bot.send_message(
+                        message.chat.id, "WAHLBETRUG!! Du host schomoi obgstimmt.")
+                self.bot.delete_state(message.from_user.id)
             except Exception as error:
                 bot.send_message(
                     self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error (LeistungsState.searchLocation)\n{error}')

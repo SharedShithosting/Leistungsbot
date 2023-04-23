@@ -4,7 +4,7 @@ import threading
 import time
 import schedule
 import yaml
-from leistungsdb import LeistungsDB
+from leistungsdb import LeistungsDB, LeistungsTagState
 from BotHelper import LeistungsTyp
 import os
 
@@ -17,6 +17,8 @@ class Scheduler(object):
         self.db = LeistungsDB()
         self.schedule = schedule
         self.schedule.every().day.at('12:00').do(self.send_reminder)
+        self.schedule.every().monday.at('12:00').do(self.send_reservation)
+        self.schedule.every().day.at('19:00').do(self.close_previous)
         self.start()
 
     def run_continuously(self, interval=1):
@@ -67,7 +69,18 @@ class Scheduler(object):
                 self.bot.forward_message(
                     self.config['leistungsadmin_id'], self.config['leistungschat_id'], poll['poll_id'])
                 self.bot.send_message(
-                    self.config['leistungsadmin_id'], f'Reservier eam schiach für moagn ({info["phone"]})! {info["url"]}')
+                    self.config['leistungsadmin_id'], f'Host eam e scho für moagn schiach reserviert ({info["phone"]})? {info["url"]}')
+
+    def close_previous(self, type: LeistungsTyp = None):
+        previous = self.db.getLeistungsTags(
+            type, LeistungsTagState.OPE, before=datetime().now())
+        for prev in previous:
+            location = self.db.getLocationName(prev['location'])
+            self.bot.send_message(
+                self.config['leistungsadmin_id'], f'Schaut so aus ois ob do a alter Leistungstag nuned geclosed worden is...I schlias {location} fia eich.')
+            self.helper.db.closeLeistungstag(leistungstag_key)
+            self.bot.stop_poll(
+                config['leistungschat_id'], leistungstag['poll_id'])
 
 
 if __name__ == '__main__':

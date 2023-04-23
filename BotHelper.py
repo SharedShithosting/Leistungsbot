@@ -76,6 +76,15 @@ class Helper(object):
             markup.add(KeyboardButton(location[0]))
         return markup
 
+    def rating_keyboard(self):
+        markup = ReplyKeyboardMarkup(row_width=1, one_time_keyboard=True)
+        # hack to allow for .25 rating
+        for i in range(0, 600, 25):
+            markup.add(KeyboardButton(self.get_stars(i/100)))
+            if i == 500:
+                return markup
+        return markup
+
     def virgine_location_button(self):
         markup = InlineKeyboardMarkup(row_width=1)
         for location in self.db.getVirgineLocations():
@@ -256,6 +265,8 @@ class Helper(object):
         return len(self.peak_from_rand_file(rand_id))
 
     def get_stars(self, rating: float):
+        if rating > 5:
+            rating = 5
         res = '🌕' * int(rating)
         rating -= int(rating)
         if rating >= 0.625:
@@ -265,6 +276,9 @@ class Helper(object):
         elif rating > 0:
             res += '🌘'
         return res.ljust(5, '🌑')
+
+    def get_rating(self, rating: str):
+        return rating.count('🌕') + rating.count('🌖') * 0.75 + rating.count('🌗') * 0.5 + rating.count('🌘') * 0.25
 
     def send_history_info(self, chat_id, leistungstag_key: int):
         ld = self.db.getLeistungstag(leistungstag_key)
@@ -282,6 +296,18 @@ class Helper(object):
             chat_id, message, parse_mode='MarkdownV2')
 
     def send_location_info2(self, chat_id, location_key: int):
+        info = self.db.getLocationInfoByKey(location_key)
+        self.send_location_info(chat_id, info["google-place-id"])
+
+        message = f"""*{self.escape_markdown(info.get('name'))}*""" + self.escape_markdown(f"""
+{info.get('address')}
+{info.get('phone')}
+{info.get('url')}""")
+        self.bot.send_message(
+            chat_id, message, parse_mode='MarkdownV2')
+
+    def send_rating_info(self, chat_id):
+        key = self.db.getLeistungstag(key)
         info = self.db.getLocationInfoByKey(location_key)
         self.send_location_info(chat_id, info["google-place-id"])
 
