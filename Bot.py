@@ -665,7 +665,8 @@ class LeistungsBot(object):
 
     def process_purge(self, message):
         self.bot.send_animation(
-            message.chat.id, 'https://giphy.com/gifs/MCZ39lz83o5lC',
+            message.chat.id, telebot.types.InputFile(
+                './resources/responisibility.gif'),
             caption='Welche Art von Leistungstag willst löschen?',
             reply_markup=self.helper.leistungstag_purge_type_button())
 

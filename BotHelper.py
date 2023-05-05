@@ -339,6 +339,9 @@ class Helper(object):
         try:
             res = self.bot.delete_message(
                 self.config['leistungschat_id'], ld['poll_id'])
+        except:
+            pass
+        try:
             res &= self.bot.delete_message(
                 self.config['leistungschat_id'], ld['venue_id'])
         except:
