@@ -33,6 +33,19 @@ class Places:
             return res.get('candidates', [])
         return []
 
+    def checkOpenHours(self, place_id):
+        place_detail = self.gmaps.place(place_id, fields=['opening_hours'])
+        opening_hours = place_detail['result']['opening_hours']['periods']     # Returns something like this: [{'close': {'day': 1, 'time': '1500'}, 'open': {'day': 1, 'time': '1200'}}, {'close': {'day': 1, 'time': '2230'}, 'open': {'day': 1, 'time': '1700'}}, {'close': {'day': 2, 'time': '1500'}, 'open': {'day': 2, 'time': '1200'}}, {'close': {'day': 2, 'time': '2230'}, 'open': {'day': 2, 'time': '1800'}}, {'close': {'day': 3, 'time': '1500'}, 'open': {'day': 3, 'time': '1200'}}, {'close': {'day': 3, 'time': '2230'}, 'open': {'day': 3, 'time': '1700'}}, {'close': {'day': 4, 'time': '1500'}, 'open': {'day': 4, 'time': '1200'}}, {'close': {'day': 4, 'time': '2230'}, 'open': {'day': 4, 'time': '1700'}}, {'close': {'day': 5, 'time': '1500'}, 'open': {'day': 5, 'time': '1200'}}, {'close': {'day': 5, 'time': '2230'}, 'open': {'day': 5, 'time': '1700'}}, {'close': {'day': 6, 'time': '2230'}, 'open': {'day': 6, 'time': '1600'}}]
+
+        # Get opening hour for tuesday == 2
+        tuesday_opening_hours = filter(lambda entry: entry['open']['day'] == 2, opening_hours)
+
+        if (len(tuesday_opening_hours) < 1):
+            return False
+
+        # ...
+
+
 
 if __name__ == '__main__':
     place = Places()
