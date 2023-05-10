@@ -1,6 +1,13 @@
 import googlemaps
 import yaml
 import os
+import datetime
+from enum import Enum
+
+class Openness(Enum):
+    CLOSED = 0
+    SHORT = 1
+    OPEN = 10
 
 
 class Places:
@@ -33,19 +40,36 @@ class Places:
             return res.get('candidates', [])
         return []
 
-    def checkOpenHours(self, place_id):
+    def checkOpenHours(self, place_id, target_day = 2, target_time = datetime.time(19, 0), duration = datetime.timedelta(hours=3)):
         place_detail = self.gmaps.place(place_id, fields=['opening_hours'])
         opening_hours = place_detail['result']['opening_hours']['periods']     # Returns something like this: [{'close': {'day': 1, 'time': '1500'}, 'open': {'day': 1, 'time': '1200'}}, {'close': {'day': 1, 'time': '2230'}, 'open': {'day': 1, 'time': '1700'}}, {'close': {'day': 2, 'time': '1500'}, 'open': {'day': 2, 'time': '1200'}}, {'close': {'day': 2, 'time': '2230'}, 'open': {'day': 2, 'time': '1800'}}, {'close': {'day': 3, 'time': '1500'}, 'open': {'day': 3, 'time': '1200'}}, {'close': {'day': 3, 'time': '2230'}, 'open': {'day': 3, 'time': '1700'}}, {'close': {'day': 4, 'time': '1500'}, 'open': {'day': 4, 'time': '1200'}}, {'close': {'day': 4, 'time': '2230'}, 'open': {'day': 4, 'time': '1700'}}, {'close': {'day': 5, 'time': '1500'}, 'open': {'day': 5, 'time': '1200'}}, {'close': {'day': 5, 'time': '2230'}, 'open': {'day': 5, 'time': '1700'}}, {'close': {'day': 6, 'time': '2230'}, 'open': {'day': 6, 'time': '1600'}}]
 
         # Get opening hour for tuesday == 2
-        tuesday_opening_hours = filter(lambda entry: entry['open']['day'] == 2, opening_hours)
+        target_day_opening_hours = list(filter(lambda entry: entry['open']['day'] == target_day, opening_hours))
 
-        if (len(tuesday_opening_hours) < 1):
-            return False
+        if (len(target_day_opening_hours) < 1):
+            return (Openness.CLOSED, place_detail['result']['opening_hours']["weekday_text"])
 
-        # ...
+        is_open = False
+        opening_hours_period = None
 
+        for h in target_day_opening_hours:
+            h['open']['time'] = datetime.time(int(h['open']['time'][0:2]), int(h['open']['time'][2:4]))
+            h['close']['time'] = datetime.time(int(h['close']['time'][0:2]), int(h['close']['time'][2:4]))
 
+            if h['open']['time'] < target_time and (h['close']['day'] != target_day or h['close']['time'] > target_time):
+                is_open = True
+                opening_hours_period = h
+                break
+
+        if is_open:
+            # Does not fully work yet, because the close day can be the next day
+            if opening_hours_period['close']['time'] - target_time < duration:
+                return (Openness.SHORT, place_detail['result']['opening_hours']["weekday_text"])
+            else:
+                return (Openness.OPEN, place_detail['result']['opening_hours']["weekday_text"])
+        else:
+            return (Openness.CLOSED, place_detail['result']['opening_hours']["weekday_text"])
 
 if __name__ == '__main__':
     place = Places()
@@ -55,3 +79,4 @@ if __name__ == '__main__':
         print(r)
         i = place.getPlaceInfo(r[0]['place_id'])
         print(i)
+        print(place.checkOpenHours(r[0]['place_id']))
