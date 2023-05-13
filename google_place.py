@@ -9,6 +9,37 @@ class Openness(Enum):
     SHORT = 1
     OPEN = 10
 
+class Weekday(Enum):
+    MONDAY = 0
+    TUESDAY = 1
+    WEDNESDAY = 2
+    THIRSDAY = 3
+    FRIDAY = 4
+    SATURDAY = 5
+    SUNDAY = 6
+
+    def toIsoWeekday(self):
+        return self.value  + 1
+
+    def toPythonWeekday(self):
+        return self.value
+
+    def toGooglePlacesWeekday(self):
+        return (self.value + 1) % 7
+
+    @staticmethod
+    def fromIsoWeekday(weekday):
+        return Weekday(weekday - 1)
+
+    @staticmethod
+    def fromPythonWeekday(weekday):
+        return Weekday(weekday)
+
+    @staticmethod
+    def fromGooglePlacesWeekday(weekday):
+        result = weekday - 1
+        return Weekday(result) if result >= 0 else Weekday(6)
+
 
 class Places:
     def __init__(self) -> None:
@@ -40,12 +71,16 @@ class Places:
             return res.get('candidates', [])
         return []
 
-    def checkOpenHours(self, place_id, target_day = 2, target_time = datetime.time(19, 0), duration = datetime.timedelta(hours=3)):
+    def checkOpenHours(self, place_id, target_day: datetime.date, target_time = datetime.time(19, 0), duration = datetime.timedelta(hours=3)):
         place_detail = self.gmaps.place(place_id, fields=['opening_hours'])
         opening_hours = place_detail['result']['opening_hours']['periods']     # Returns something like this: [{'close': {'day': 1, 'time': '1500'}, 'open': {'day': 1, 'time': '1200'}}, {'close': {'day': 1, 'time': '2230'}, 'open': {'day': 1, 'time': '1700'}}, {'close': {'day': 2, 'time': '1500'}, 'open': {'day': 2, 'time': '1200'}}, {'close': {'day': 2, 'time': '2230'}, 'open': {'day': 2, 'time': '1800'}}, {'close': {'day': 3, 'time': '1500'}, 'open': {'day': 3, 'time': '1200'}}, {'close': {'day': 3, 'time': '2230'}, 'open': {'day': 3, 'time': '1700'}}, {'close': {'day': 4, 'time': '1500'}, 'open': {'day': 4, 'time': '1200'}}, {'close': {'day': 4, 'time': '2230'}, 'open': {'day': 4, 'time': '1700'}}, {'close': {'day': 5, 'time': '1500'}, 'open': {'day': 5, 'time': '1200'}}, {'close': {'day': 5, 'time': '2230'}, 'open': {'day': 5, 'time': '1700'}}, {'close': {'day': 6, 'time': '2230'}, 'open': {'day': 6, 'time': '1600'}}]
 
+        wd = Weekday.fromPythonWeekday(target_day.weekday).toGooglePlacesWeekday()
+
         # Get opening hour for tuesday == 2
-        target_day_opening_hours = list(filter(lambda entry: entry['open']['day'] == target_day, opening_hours))
+        target_day_opening_hours = list(filter(lambda entry: entry['open']['day'] == wd, opening_hours))
+
+        # TODO: Transform weekday and time to actual datetimes, for easier handling
 
         if (len(target_day_opening_hours) < 1):
             return (Openness.CLOSED, place_detail['result']['opening_hours']["weekday_text"])
