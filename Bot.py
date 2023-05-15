@@ -22,6 +22,7 @@ from telebot.handler_backends import State, StatesGroup  # States
 # States storage
 from telebot.storage import StateMemoryStorage
 from datetime import datetime, timedelta
+from google_place import Openness
 # Now, you can pass storage to bot.
 state_storage = StateMemoryStorage()  # you can init here another storage
 
@@ -502,7 +503,22 @@ class LeistungsBot(object):
             try:
                 location = self.process_poll_location(message)
                 if location:
-                    self.helper.send_leistungstag(message.chat.id, location)
+                    # Check open hours
+                    date = (datetime.now() + timedelta(days=(8 - datetime.now().weekday())))
+                    open_state = self.helper.check_open_hours(location, date)
+                    if open_state[0] == Openness.CLOSED:
+                        pass
+                        # TODO: Question - "I glaub ned, dass de offn hom. Bist da sicha?" + opening hours
+                    elif open_state[0] == Openness.SHORT:
+                        pass
+                        # TODO: Question - "Des da des long gmua?" + opening hours
+                    else:
+                        if open_state[0] == Openness.UNKNOWN:
+                            pass
+                            # TODO: I was jetzt hod ned, ob de offen hom. Muast söwa schaun.
+
+                        self.helper.send_leistungstag(message.chat.id, location, date=date)
+
             except Exception as error:
                 bot.send_message(
                     self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')

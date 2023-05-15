@@ -8,7 +8,7 @@ import yaml
 import random
 from enum import IntEnum
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 import tempfile
 import os
 import pickle
@@ -384,6 +384,10 @@ The error was informed to @eckphi''')
         self.bot.send_message(chat_id,
                               f"Select {LSTEP[step]}",
                               reply_markup=calendar)
+
+    def check_open_hours(self, location:str, date: datetime):
+        place_info = self.db.getLocationInfo(location)
+        return self.google.checkOpenHours(place_info['google-place-id'], date)
 
 
 class PersistantLeistungsTagPoller():
