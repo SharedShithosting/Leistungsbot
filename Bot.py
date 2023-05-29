@@ -21,7 +21,7 @@ from telebot import custom_filters
 from telebot.handler_backends import State, StatesGroup  # States
 # States storage
 from telebot.storage import StateMemoryStorage
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 # Now, you can pass storage to bot.
 state_storage = StateMemoryStorage()  # you can init here another storage
 
@@ -95,7 +95,8 @@ class LeistungsBot(object):
 
         @bot.callback_query_handler(func=DetailedTelegramCalendar.func())
         def cal(call):
-            result, key, step = DetailedTelegramCalendar().process(call.data)
+            result, key, step = DetailedTelegramCalendar(
+                min_date=date.today()).process(call.data)
             if not result and key:
                 self.helper.bot.edit_message_text(f"Select {LSTEP[step]}",
                                                   call.message.chat.id,
@@ -111,7 +112,7 @@ class LeistungsBot(object):
                     return
                 if (self.poller.type == LeistungsTyp.NORMAL or self.poller.type == LeistungsTyp.KONKURENZ) and result.weekday() != 1:
                     self.helper.bot.send_message(
-                        call.message.chat_id, "Blasphemie, des is ka Dienstag wast da du do ausgsuacht hast...alles auf eigene Gefahr!", )
+                        call.message.chat.id, "Blasphemie, des is ka Dienstag wast da du do ausgsuacht hast...alles auf eigene Gefahr!", )
 
                 self.poller.dry_send_with_date(result)
 
@@ -173,6 +174,16 @@ class LeistungsBot(object):
                         self.process_reminder(call.message, val)
                     elif self.bot.get_state(call.from_user.id, call.message.chat.id) == LeistungsState.closePoll.name:
                         self.process_closepoll(call.message, val)
+                elif cmd == 'poll_date':
+                    if val:
+                        if not self.poller:
+                            self.helper.bot.send_message(
+                                call.message.chat_id, "Da is wohl was schiefglaufen, i kann ka poll findn...")
+                        else:
+                            self.poller.dry_send_with_date(
+                                datetime.strptime(val, self.helper.dateformat))
+                    else:
+                        self.helper.pick_date(call.message.chat.id)
                 else:
                     bot.send_message(
                         self.helper.config['chat_id'], f'Hi Devs!!\nHandle this callback\n{cmd}')
@@ -257,39 +268,39 @@ class LeistungsBot(object):
                 self.process_purge(message)
             except IndexError:
                 return bot.reply_to(message, f'''Lol!!! An error in the wild:
-        {message.text}
+                    {message.text}
 
-        Which is invalid.
-        For more help use: /help
-        ''')
+                    Which is invalid.
+                    For more help use: /help
+                    ''')
             except Exception as error:
                 bot.send_message(self.helper.config['chat_id'], f'''Error From Poll Bot!
 
-        Error  :: {error}
+                    Error  :: {error}
 
-        --------------------------------
+                    --------------------------------
 
-        Command:: {message.text}
+                    Command:: {message.text}
 
-        --------------------------------
+                    --------------------------------
 
-        UserDetails: {message.from_user}
+                    UserDetails: {message.from_user}
 
-        --------------------------------
+                    --------------------------------
 
-        Date   :: {message.date}
+                    Date   :: {message.date}
 
-        --------------------------------
+                    --------------------------------
 
-        The Complete Detail:
-        {message}
+                    The Complete Detail:
+                    {message}
 
 
-        ''')
+                    ''')
 
                 return bot.reply_to(message, f'''An Unexpected Error Occured!
-        Error::  {error}
-        The error was informed to @eckphi''')
+                    Error::  {error}
+                    The error was informed to @eckphi''')
 
         @bot.message_handler(commands=['alive'])
         def alive(message):
@@ -502,7 +513,10 @@ class LeistungsBot(object):
             try:
                 location = self.process_poll_location(message)
                 if location:
-                    self.helper.send_leistungstag(message.chat.id, location)
+                    self.poller = PersistantLeistungsTagPoller(
+                        self.helper, message.chat.id, location, LeistungsTyp.NORMAL)
+                    self.helper.bot.reply_to(
+                        message, "Für wann wollen ma pollen?", reply_markup=self.helper.date_suggester())
             except Exception as error:
                 bot.send_message(
                     self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')
@@ -517,7 +531,8 @@ class LeistungsBot(object):
                 if location:
                     self.poller = PersistantLeistungsTagPoller(
                         self.helper, message.chat.id, location, LeistungsTyp.KONKURENZ)
-                    self.helper.pick_date(message.chat.id)
+                    self.helper.bot.reply_to(
+                        message, "Für wann wollen ma pollen?", reply_markup=self.helper.date_suggester())
             except Exception as error:
                 bot.send_message(
                     self.helper.config['chat_id'], f'Hi Devs!!\nHandle This Error plox\n{error}')

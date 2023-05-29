@@ -8,7 +8,7 @@ import yaml
 import random
 from enum import IntEnum
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import tempfile
 import os
 import pickle
@@ -30,6 +30,7 @@ class Helper(object):
         self.db = LeistungsDB()
         self.temp_dir = tempfile.gettempdir()
         self.google = Places()
+        self.dateformat = '%d.%m.%Y'
 
     def filter(self):
         def inn(callback):
@@ -199,11 +200,14 @@ class Helper(object):
         self.bot.send_animation(
             chat_id, gif, caption='brought to you by Maxmaier')
 
+    def next_leistungstag(self):
+        return (datetime.now() + timedelta(
+                days=(8 - datetime.now().weekday())))
+
     def send_leistungstag(self, chat_id, location: str, type: LeistungsTyp = LeistungsTyp.NORMAL, date: datetime = None, dry_run: bool = True):
         if not date:
-            date = (datetime.now() + timedelta(
-                days=(8 - datetime.now().weekday())))
-        date_str = date.strftime('%d.%m.%Y')
+            date = self.next_leistungstag()
+        date_str = date.strftime(self.dateformat)
         close_date = date - timedelta(hours=12)
         info = self.db.getLocationInfo(location)
         venue_id = self.bot.send_venue(chat_id, latitude=info['lat'],
@@ -286,7 +290,7 @@ class Helper(object):
         rating = self.db.getAvgLocationRating(info['name'])
 
         message = f"""*{self.escape_markdown(info.get('name'))}*""" + self.escape_markdown(f"""
-{ld['date'].strftime('%d.%m.%Y')}
+{ld['date'].strftime(self.dateformat)}
 {self.get_stars(rating)}
 {info.get('address')}
 {info.get('phone')}
@@ -324,7 +328,7 @@ class Helper(object):
         rating = self.db.getAvgLocationRating(info['name'])
 
         message = f"""*{self.escape_markdown(info.get('name'))}*""" + self.escape_markdown(f"""
-{ld['date'].strftime('%d.%m.%Y')}
+{ld['date'].strftime(self.dateformat)}
 {self.get_stars(rating)}
 {info.get('address')}
 {info.get('phone')}
@@ -380,10 +384,22 @@ Error::  {error}
 The error was informed to @eckphi''')
 
     def pick_date(self, chat_id):
-        calendar, step = DetailedTelegramCalendar().build()
+        calendar, step = DetailedTelegramCalendar(
+            min_date=date.today()).build()
         self.bot.send_message(chat_id,
                               f"Select {LSTEP[step]}",
                               reply_markup=calendar)
+
+    def date_suggester(self):
+        markup = InlineKeyboardMarkup(row_width=1, )
+        next_tuseday = self.next_leistungstag()
+        markup.add(
+            InlineKeyboardButton(
+                next_tuseday.strftime(self.dateformat), callback_data=json.dumps({'🍻poll_date': next_tuseday.strftime(self.dateformat)})))
+        markup.add(
+            InlineKeyboardButton(
+                'Anderes Datum', callback_data=json.dumps({'🍻poll_date': None})))
+        return markup
 
 
 class PersistantLeistungsTagPoller():
@@ -391,7 +407,7 @@ class PersistantLeistungsTagPoller():
         self.chat_id = chat_id
         self.location = location
         self.type = type
-        self.date = date
+        self.date = date if date else helper.next_leistungstag()
         self.helper = helper
 
     def dry_send_with_date(self, date: datetime):
