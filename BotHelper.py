@@ -200,9 +200,6 @@ class Helper(object):
             chat_id, gif, caption='brought to you by Maxmaier')
 
     def send_leistungstag(self, chat_id, location: str, type: LeistungsTyp = LeistungsTyp.NORMAL, date: datetime = None, dry_run: bool = True):
-        if not date:
-            date = (datetime.now() + timedelta(
-                days=(8 - datetime.now().weekday())))
         date_str = date.strftime('%d.%m.%Y')
         close_date = date - timedelta(hours=12)
         info = self.db.getLocationInfo(location)
