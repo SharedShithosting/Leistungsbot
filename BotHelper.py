@@ -100,6 +100,12 @@ class Helper(object):
                 callback_data=json.dumps({'🍻open': leistungstag['key']})))
         return markup
 
+    def check_open_hours_keyboard(self):
+        markup = InlineKeyboardMarkup(row_width=1, one_time_keyboard=True)
+        markup.add(InlineKeyboardButton("Passt so", callback_data=json.dumps({'approved': True})))
+        markup.add(InlineKeyboardButton("Abort!", callback_data=json.dumps({'approved': False})))
+        return markup
+
     def search_location(self, query):
         g_places = self.google.findPlace(query)
         return len(g_places), self.store_to_rand_file(g_places)
