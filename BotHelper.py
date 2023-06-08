@@ -101,10 +101,10 @@ class Helper(object):
                 callback_data=json.dumps({'🍻open': leistungstag['key']})))
         return markup
 
-    def check_open_hours_keyboard(self):
+    def check_open_hours_keyboard(self, agree_message):
         markup = InlineKeyboardMarkup(row_width=1)
-        markup.add(InlineKeyboardButton("Passt so", callback_data=json.dumps({'🍻open_hours_checked': True})))
-        markup.add(InlineKeyboardButton("Abort!", callback_data=json.dumps({'🍻open_hours_checked': False})))
+        markup.add(InlineKeyboardButton(agree_message, callback_data=json.dumps({'🍻open_hours_checked': True})))
+        markup.add(InlineKeyboardButton("Hoitaus. Abort!", callback_data=json.dumps({'🍻open_hours_checked': False})))
         return markup
 
     def search_location(self, query):
@@ -407,9 +407,9 @@ The error was informed to @eckphi''')
                 'Anderes Datum', callback_data=json.dumps({'🍻poll_date': None})))
         return markup
 
-    def check_open_hours(self, location:str, date: datetime):
+    def check_open_hours(self, location: str, date: date, time: time = time(19, 00)):
         place_info = self.db.getLocationInfo(location)
-        return self.google.checkOpenHours(place_info['google-place-id'], date.date())
+        return self.google.checkOpenHours(place_info['google-place-id'], date, time)
 
 
 class PersistantLeistungsTagPoller():

@@ -84,8 +84,6 @@ class LeistungsState(StatesGroup):
     closePoll = State()
     removeLocation = State()
     rateLocation = State()
-    checkOpenHours = State()
-
 
 class LeistungsBot(object):
     def __init__(self) -> None:
@@ -117,7 +115,7 @@ class LeistungsBot(object):
                     self.helper.bot.send_message(
                         call.message.chat.id, "Blasphemie, des is ka Dienstag wast da du do ausgsuacht hast...alles auf eigene Gefahr!", )
 
-                self.poller.dry_send_with_date(result)
+                self.check_open_hours_before_sending(call, result)
 
         @bot.callback_query_handler(func=self.helper.filter())
         def callback_query(call):
@@ -183,8 +181,7 @@ class LeistungsBot(object):
                             self.helper.bot.send_message(
                                 call.message.chat_id, "Da is wohl was schiefglaufen, i kann ka poll findn...")
                         else:
-                            self.poller.dry_send_with_date(
-                                datetime.strptime(val, self.helper.dateformat))
+                            self.check_open_hours_before_sending(call, datetime.strptime(val, self.helper.dateformat))
                     else:
                         self.helper.pick_date(call.message.chat.id)
                 elif cmd == 'open_hours_checked':
@@ -668,9 +665,7 @@ class LeistungsBot(object):
 
     def process_check_open_hours(self, callback, open_hours_correct):
         if open_hours_correct:
-            self.helper.send_leistungstag(callback.message.chat.id,
-                                          self.state_kargs[(callback.from_user.id, callback.message.chat.id)]['location'],
-                                          date=self.state_kargs[(callback.from_user.id, callback.message.chat.id)]['date'])
+            self.poller.dry_send()
 
     def process_send_nudes(self, message):
         self.helper.send_nude(message)
@@ -696,6 +691,27 @@ class LeistungsBot(object):
                 './resources/responisibility.gif'),
             caption='Welche Art von Leistungstag willst löschen?',
             reply_markup=self.helper.leistungstag_purge_type_button())
+
+    def check_open_hours_before_sending(self, call, date: date):
+        open_state = self.helper.check_open_hours(self.poller.location, date)
+
+        if open_state[0] == Openness.OPEN:
+            self.poller.dry_send_with_date(date)
+        else:
+            self.poller.date = date
+
+            if open_state[0] == Openness.CLOSED:
+                # TODO: Question - "I glaub ned, dass de offn hom. Bist da sicha?" + opening hours
+                self.bot.send_message(call.message.chat.id, "I glaub ned, dass de offn hom. Bist da sicha?\n\n" + open_state[1],
+                                    reply_markup=self.helper.check_open_hours_keyboard("Des passt so, I kenn mi aus"))
+            elif open_state[0] == Openness.SHORT:
+                # TODO: Question - "Des da des long gmua?" + opening hours
+                self.bot.send_message(call.message.chat.id, "Is da des long gmua?\n\n" + open_state[1],
+                                    reply_markup=self.helper.check_open_hours_keyboard("Jo, passt scho"))
+            elif open_state[0] == Openness.UNKNOWN:
+                # TODO: I was jetzt hod ned, ob de offen hom. Muast söwa schaun.
+                self.bot.send_message(call.message.chat.id, "I was jetzt hod ned, ob de offen hom. Muast söwa schaun.",
+                                    reply_markup=self.helper.check_open_hours_keyboard("Des passt so, I kenn mi aus"))
 
     def infinite_poll(self):
         self.bot.infinity_polling()
