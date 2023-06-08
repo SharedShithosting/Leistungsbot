@@ -255,7 +255,7 @@ class LeistungsDB(object):
                 raise Exception("No connection to DataBase available")
 
         cursor = self.mydb.cursor()
-        sql = "SELECT `name`, `key` FROM `locations` WHERE `visited` = FALSE;"
+        sql = "SELECT `name`, `key` FROM `locations` WHERE `visited` = FALSE ORDER BY `name` DESC;"
         values = ()
         logging.debug(sql % values)
         cursor.execute(sql, values)
