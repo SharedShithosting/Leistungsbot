@@ -22,6 +22,7 @@ from telebot.handler_backends import State, StatesGroup  # States
 # States storage
 from telebot.storage import StateMemoryStorage
 from datetime import datetime, timedelta, date
+import time
 from google_place import Openness
 # Now, you can pass storage to bot.
 state_storage = StateMemoryStorage()  # you can init here another storage
@@ -114,6 +115,7 @@ class LeistungsBot(object):
                 if (self.poller.type == LeistungsTyp.NORMAL or self.poller.type == LeistungsTyp.KONKURENZ) and result.weekday() != 1:
                     self.helper.bot.send_message(
                         call.message.chat.id, "Blasphemie, des is ka Dienstag wast da du do ausgsuacht hast...alles auf eigene Gefahr!", )
+                    time.sleep(1)
 
                 self.check_open_hours_before_sending(call, result)
 
