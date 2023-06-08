@@ -84,6 +84,7 @@ class LeistungsState(StatesGroup):
     closePoll = State()
     removeLocation = State()
     rateLocation = State()
+    checkOpenHours = State()
 
 
 class LeistungsBot(object):
@@ -506,17 +507,24 @@ class LeistungsBot(object):
                     # Check open hours
                     date = (datetime.now() + timedelta(days=(8 - datetime.now().weekday())))
                     open_state = self.helper.check_open_hours(location, date)
-                    if open_state[0] == Openness.CLOSED:
-                        pass
-                        # TODO: Question - "I glaub ned, dass de offn hom. Bist da sicha?" + opening hours
-                    elif open_state[0] == Openness.SHORT:
-                        pass
-                        # TODO: Question - "Des da des long gmua?" + opening hours
-                    else:
-                        if open_state[0] == Openness.UNKNOWN:
-                            pass
-                            # TODO: I was jetzt hod ned, ob de offen hom. Muast söwa schaun.
 
+                    if open_state[0] != Openness.OPEN:
+                        if open_state[0] == Openness.CLOSED:
+                            # TODO: Question - "I glaub ned, dass de offn hom. Bist da sicha?" + opening hours
+                            bot.send_message(message.chat.id, "I glaub ned, dass de offn hom. Bist da sicha?\n\n" + open_state[1],
+                                             reply_markup=self.helper.check_open_hours_keyboard())
+                        elif open_state[0] == Openness.SHORT:
+                            # TODO: Question - "Des da des long gmua?" + opening hours
+                            bot.send_message(message.chat.id, "Is da des long gmua?\n\n" + open_state[1],
+                                             reply_markup=self.helper.check_open_hours_keyboard())
+                        elif open_state[0] == Openness.UNKNOWN:
+                            # TODO: I was jetzt hod ned, ob de offen hom. Muast söwa schaun.
+                            bot.send_message(message.chat.id, "I was jetzt hod ned, ob de offen hom. Muast söwa schaun.",
+                                             reply_markup=self.helper.check_open_hours_keyboard())
+
+                        self.bot.set_state(message.from_user.id,
+                               LeistungsState.checkOpenHours, message.chat.id)
+                    else:
                         self.helper.send_leistungstag(message.chat.id, location, date=date)
 
             except Exception as error:
@@ -525,6 +533,10 @@ class LeistungsBot(object):
                 bot.reply_to(message, f'An error occurred!\nError: {error}')
                 bot.send_message(
                     self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
+
+        @bot.message_handler(state=LeistungsState.checkOpenHours)
+        def process_check_location_answer(message):
+            pass
 
         @bot.message_handler(state=LeistungsState.konkurrenzLocation)
         def getPollLocation(message):
