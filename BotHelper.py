@@ -101,10 +101,10 @@ class Helper(object):
                 callback_data=json.dumps({'🍻open': leistungstag['key']})))
         return markup
 
-    def check_open_hours_keyboard(self, agree_message):
+    def check_open_hours_keyboard(self, agree_message, abort_message="Hoitaus. Abort!"):
         markup = InlineKeyboardMarkup(row_width=1)
         markup.add(InlineKeyboardButton(agree_message, callback_data=json.dumps({'🍻open_hours_checked': True})))
-        markup.add(InlineKeyboardButton("Hoitaus. Abort!", callback_data=json.dumps({'🍻open_hours_checked': False})))
+        markup.add(InlineKeyboardButton(abort_message, callback_data=json.dumps({'🍻open_hours_checked': False})))
         return markup
 
     def search_location(self, query):

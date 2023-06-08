@@ -701,17 +701,14 @@ class LeistungsBot(object):
             self.poller.date = date
 
             if open_state[0] == Openness.CLOSED:
-                # TODO: Question - "I glaub ned, dass de offn hom. Bist da sicha?" + opening hours
                 self.bot.send_message(call.message.chat.id, "I glaub ned, dass de offn hom. Bist da sicha?\n\n" + open_state[1],
-                                    reply_markup=self.helper.check_open_hours_keyboard("Des passt so, I kenn mi aus"))
+                                    reply_markup=self.helper.check_open_hours_keyboard("Des passt so, i kenn mi aus"))
             elif open_state[0] == Openness.SHORT:
-                # TODO: Question - "Des da des long gmua?" + opening hours
                 self.bot.send_message(call.message.chat.id, "Is da des long gmua?\n\n" + open_state[1],
                                     reply_markup=self.helper.check_open_hours_keyboard("Jo, passt scho"))
             elif open_state[0] == Openness.UNKNOWN:
-                # TODO: I was jetzt hod ned, ob de offen hom. Muast söwa schaun.
                 self.bot.send_message(call.message.chat.id, "I was jetzt hod ned, ob de offen hom. Muast söwa schaun.",
-                                    reply_markup=self.helper.check_open_hours_keyboard("Des passt so, I kenn mi aus"))
+                                    reply_markup=self.helper.check_open_hours_keyboard("Des passt so, i kenn mi aus", "Schaut schlecht aus"))
 
     def infinite_poll(self):
         self.bot.infinity_polling()
