@@ -94,6 +94,7 @@ class LeistungsBot(object):
         self.helper = Helper(self.bot)
         self.scheduler = Scheduler(self.bot)
         self.poller = None
+        self.state_kargs = {}
 
         @bot.callback_query_handler(func=DetailedTelegramCalendar.func())
         def cal(call):
@@ -175,6 +176,8 @@ class LeistungsBot(object):
                         self.process_reminder(call.message, val)
                     elif self.bot.get_state(call.from_user.id, call.message.chat.id) == LeistungsState.closePoll.name:
                         self.process_closepoll(call.message, val)
+                elif cmd == 'open_hours_checked':
+                    self.process_check_open_hours(call, val)
                 else:
                     bot.send_message(
                         self.helper.config['chat_id'], f'Hi Devs!!\nHandle this callback\n{cmd}')
@@ -524,6 +527,7 @@ class LeistungsBot(object):
 
                         self.bot.set_state(message.from_user.id,
                                LeistungsState.checkOpenHours, message.chat.id)
+                        self.state_kargs[(message.from_user.id, message.chat.id)] = {'location': location, 'date': date}
                     else:
                         self.helper.send_leistungstag(message.chat.id, location, date=date)
 
@@ -533,10 +537,6 @@ class LeistungsBot(object):
                 bot.reply_to(message, f'An error occurred!\nError: {error}')
                 bot.send_message(
                     self.helper.config['chat_id'], f'An error occurred!\nError: {error}')
-
-        @bot.message_handler(state=LeistungsState.checkOpenHours)
-        def process_check_location_answer(message):
-            pass
 
         @bot.message_handler(state=LeistungsState.konkurrenzLocation)
         def getPollLocation(message):
@@ -672,6 +672,13 @@ class LeistungsBot(object):
             config['leistungschat_id'], 'Schluss, aus, vorbei die Wahl is glaufen und für de de abgstimmt haben is a Platzerl reserviert.', reply_to_message_id=leistungstag['poll_id'])
         self.bot.send_message(
             message.chat.id, 'De Poll is zua. I hoff für dich d Reservierung is scho erledigt!')
+
+
+    def process_check_open_hours(self, callback, open_hours_correct):
+        if open_hours_correct:
+            self.helper.send_leistungstag(callback.message.chat.id,
+                                          self.state_kargs[(callback.from_user.id, callback.message.chat.id)]['location'],
+                                          date=self.state_kargs[(callback.from_user.id, callback.message.chat.id)]['date'])
 
     def process_send_nudes(self, message):
         self.helper.send_nude(message)

@@ -105,17 +105,19 @@ class Places:
 
             hours.append(Hours(open, close))
 
+        weekday_text = '\n'.join(place_detail['result']['opening_hours']["weekday_text"])
+
         if (len(hours) < 1):
-            return (Openness.CLOSED, place_detail['result']['opening_hours']["weekday_text"])
+            return (Openness.CLOSED, weekday_text)
 
         for h in hours:
             if h.open <= target_date and h.close > target_date:
                 if h.close - target_date < duration:
-                    return (Openness.SHORT, place_detail['result']['opening_hours']["weekday_text"])
+                    return (Openness.SHORT, weekday_text)
                 else:
-                    return (Openness.OPEN, place_detail['result']['opening_hours']["weekday_text"])
+                    return (Openness.OPEN, weekday_text)
 
-        return (Openness.CLOSED, place_detail['result']['opening_hours']["weekday_text"])
+        return (Openness.CLOSED, weekday_text)
 
 if __name__ == '__main__':
     place = Places()

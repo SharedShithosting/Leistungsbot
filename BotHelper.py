@@ -101,9 +101,9 @@ class Helper(object):
         return markup
 
     def check_open_hours_keyboard(self):
-        markup = InlineKeyboardMarkup(row_width=1, one_time_keyboard=True)
-        markup.add(InlineKeyboardButton("Passt so", callback_data=json.dumps({'approved': True})))
-        markup.add(InlineKeyboardButton("Abort!", callback_data=json.dumps({'approved': False})))
+        markup = InlineKeyboardMarkup(row_width=1)
+        markup.add(InlineKeyboardButton("Passt so", callback_data=json.dumps({'🍻open_hours_checked': True})))
+        markup.add(InlineKeyboardButton("Abort!", callback_data=json.dumps({'🍻open_hours_checked': False})))
         return markup
 
     def search_location(self, query):
@@ -390,7 +390,7 @@ The error was informed to @eckphi''')
 
     def check_open_hours(self, location:str, date: datetime):
         place_info = self.db.getLocationInfo(location)
-        return self.google.checkOpenHours(place_info['google-place-id'], date)
+        return self.google.checkOpenHours(place_info['google-place-id'], date.date())
 
 
 class PersistantLeistungsTagPoller():
