@@ -181,7 +181,7 @@ class LeistungsBot(object):
                             self.helper.bot.send_message(
                                 call.message.chat_id, "Da is wohl was schiefglaufen, i kann ka poll findn...")
                         else:
-                            self.check_open_hours_before_sending(call, datetime.strptime(val, self.helper.dateformat))
+                            self.check_open_hours_before_sending(call, datetime.strptime(val, self.helper.dateformat).date())
                     else:
                         self.helper.pick_date(call.message.chat.id)
                 elif cmd == 'open_hours_checked':
