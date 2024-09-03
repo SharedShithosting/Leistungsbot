@@ -3,7 +3,30 @@ name = "leistungsbot"
 version = "0.0.1"
 description = ""
 authors = ["EckPhi"]
+readme = "README.md"
+include = [{ path = "resources", format = ["sdist", "wheel"] }]
 
 [tool.poetry.dependencies]
+python = "^3.11"
 pyTelegramBotAPI = "^4.5.0"
-telebot = "^0.0.4"
+mysql-connector-python = "^9.0.0"
+googlemaps = "^4.10.0"
+pyyaml = "^6.0.2"
+urllib3 = "^2.2.2"
+schedule = "^1.2.2"
+python-telegram-bot-calendar = "^1.0.5"
+requests = "^2.32.3"
+platformdirs = "^4.2.2"
+
+
+[tool.poetry.scripts]
+leistungsbot = "leistungsbot.__main__:main"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.2"
+black = "24.4.2"
+pre-commit = "^3.8.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
