@@ -1,0 +1,12 @@
+appdirs==1.4.3
+packaging==16.8
+pyparsing==2.2.0
+requests
+six==1.10.0
+pyTelegramBotAPI
+mysql-connector-python==8.0.29
+urllib3
+googlemaps
+pyyaml
+schedule
+python-telegram-bot-calendar

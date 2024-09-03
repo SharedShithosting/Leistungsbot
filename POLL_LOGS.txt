@@ -1,0 +1,48 @@
+<pollbot command = log>
+Username: None
+User Id : 673652679
+Command : /poll
+OWNER : eckphi
+Chat Id : 673652679
+ChatType: private
+GroupUserName: None
+Date    : 2022-05-31 14:34:27.321657
+
+<split info_end = True>Command Over</split>
+
+<pollbot command = log>
+Username: None
+User Id : 673652679
+Command : /poll | your question | option1, option2, more options | **kwargs
+OWNER : eckphi
+Chat Id : 673652679
+ChatType: private
+GroupUserName: None
+Date    : 2022-05-31 14:34:41.900415
+
+<split info_end = True>Command Over</split>
+
+<pollbot command = log>
+Username: None
+User Id : 673652679
+Command : /poll | your question | option1, option2, more options | kwargs
+OWNER : eckphi
+Chat Id : 673652679
+ChatType: private
+GroupUserName: None
+Date    : 2022-05-31 14:35:09.874766
+
+<split info_end = True>Command Over</split>
+
+<pollbot command = log>
+Username: None
+User Id : 673652679
+Command : /poll | your question | option1, option2, more options
+OWNER : eckphi
+Chat Id : 673652679
+ChatType: private
+GroupUserName: None
+Date    : 2022-05-31 14:35:23.857143
+
+<split info_end = True>Command Over</split>
+

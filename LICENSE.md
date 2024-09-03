@@ -1,2 +1,8 @@
-
-Copyright (C) 2022 Philip
+/*
+* ----------------------------------------------------------------------------
+* "THE BEER-WARE LICENSE" (Revision 42):
+* <leistungsbot@hsd-kuchl.at> wrote this file. As long as you retain this notice you
+* can do whatever you want with this stuff. If we meet some day, and you think
+* this stuff is worth it, you can buy me a beer in return Poul-Henning Kamp
+* ----------------------------------------------------------------------------
+*/
