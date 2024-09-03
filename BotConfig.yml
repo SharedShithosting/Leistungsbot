@@ -1,0 +1,14 @@
+mysql:
+  host: '10.1.1.111'
+  db: 'leistungs_db'
+  user: 'leistungs_user'
+  password: '8JpoPax7TEyGCY'
+google: 'AIzaSyBMKBXDsGvMtBMBYBPLBL-dJ5tkFf2nlBk'
+bot_token: '5277349785:AAGbCz4ozwI0l5CnkqHv2ZKhDdGi0s7Rnw0'  # YOUR BOT TOKEN HERE GET FROM @BotFather
+api_hash: '60f71bfe3b2f6e386597050b61ae03d7'  # YOUR API HASH GET FROM my.telegram.org
+api_id: '13242285'  # YOUR API ID GET FROM my.telegram.org
+chat_id: '-666753063'  # YOUR PRIVATE GROUP TO VIEW LOGS OR ERROR
+leistungschat_id: '-1001517264648'
+leistungsadmin_id: '-1001503308928'
+usernames:
+  - 'eckphi'  # YOUR USERNAME THIS IS MANDTORY

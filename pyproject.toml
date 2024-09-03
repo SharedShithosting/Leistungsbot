@@ -1,0 +1,9 @@
+[tool.poetry]
+name = "leistungsbot"
+version = "0.0.1"
+description = ""
+authors = ["EckPhi"]
+
+[tool.poetry.dependencies]
+pyTelegramBotAPI = "^4.5.0"
+telebot = "^0.0.4"
