@@ -1,0 +1,25 @@
+# Use root/example as user/password credentials
+version: '3.1'
+services:
+  db:
+    image: mariadb
+    restart: always
+    ports:
+      - 3306:3306
+    environment:
+      MARIADB_ROOT_PASSWORD: leistungsroot
+      MARIADB_USER: leistungs_user
+      MARIADB_PASSWORD: 8JpoPax7TEyGCY
+      MARIADB_DATABASE: leistungs_db
+    volumes:
+      - ./leistung_db.sql:/docker-entrypoint-initdb.d/leistung_db.sql
+      - db_storage:/var/lib/mysql
+  phpmyadmin:
+    image: phpmyadmin
+    restart: always
+    ports:
+      - 8080:80
+    environment:
+      - PMA_ARBITRARY=1
+volumes:
+  db_storage:
