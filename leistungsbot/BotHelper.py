@@ -377,7 +377,7 @@ class Helper:
             self.db.addLeistungsTag(
                 date,
                 location,
-                poll_message.message_id,
+                poll_message.poll.poll_id,
                 venue_id.message_id,
                 int(type),
             )
