@@ -1,0 +1,21 @@
+name: pre-commit-check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+    - name: run pre-commit
+      uses: cloudposse/github-action-pre-commit@v4.0.0
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        git_user_name: pre-commit
+        git_user_email: pre-commit@shared-shit-hosting.com
+        git_commit_message: "pre-commit fixes"
+          
