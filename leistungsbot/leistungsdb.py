@@ -1,3 +1,9 @@
+# #############################################################################
+#  "THE BEER-WARE LICENSE" (Revision 42):                                     #
+#  @eckphi wrote this file. As long as you retain this notice you             #
+#  can do whatever you want with this stuff. If we meet some day, and you think
+#  this stuff is worth it, you can buy me a beer in return Poul-Henning Kamp  #
+# #############################################################################
 from __future__ import annotations
 
 import logging
@@ -9,7 +15,6 @@ from enum import Enum
 
 import mysql.connector
 import yaml
-from mysql.connector import errorcode
 
 from leistungsbot.google_place import Places
 
@@ -47,7 +52,7 @@ class LeistungsDB:
         if not mysql_res:
             return None
 
-        elif type(mysql_res) == dict:
+        elif isinstance(mysql_res, dict):
             for k in mysql_res:
                 mysql_res[k] = self.convert(mysql_res[k], skinny_bitch)
 
@@ -57,10 +62,10 @@ class LeistungsDB:
             if skinny_bitch and len(mysql_res) == 1:
                 return mysql_res[0]
 
-        elif type(mysql_res) == bytearray:
+        elif isinstance(mysql_res, bytearray):
             pass
 
-        elif type(mysql_res) == str:
+        elif isinstance(mysql_res, str):
             if "POINT" in mysql_res:
                 return re.findall(r"[\d\.]+", mysql_res)
 
@@ -94,7 +99,7 @@ class LeistungsDB:
             )
             logging.debug(sql % values)
             cursor.execute(sql, values)
-        except mysql.connector.IntegrityError as err:
+        except mysql.connector.IntegrityError:
             cursor.execute(
                 "UPDATE `members` SET `left` = %s, `chat_id` = %s WHERE `user_id` = %s;",
                 (None, chat_id, user_id),
@@ -203,7 +208,7 @@ class LeistungsDB:
                 logging.debug(sql % values)
                 cursor.execute(sql, values)
                 retry = False
-            except mysql.connector.IntegrityError as err:
+            except mysql.connector.IntegrityError:
                 cnt += 1
                 name = orig_name + str(cnt)
         self.mydb.commit()
@@ -376,9 +381,7 @@ class LeistungsDB:
 
         lKey = self.getLocationKey(location_name)
         cursor = self.mydb.cursor()
-        sql = (
-            "SELECT AVG(`rating`) FROM `location_rating` WHERE `location` = %s;"
-        )
+        sql = "SELECT AVG(`rating`) FROM `location_rating` WHERE `location` = %s;"
         values = (lKey,)
         logging.debug(sql % values)
         cursor.execute(sql, values)
@@ -408,7 +411,9 @@ class LeistungsDB:
 
         uKey = self.getUserKey(user_id)
         cursor = self.mydb.cursor()
-        sql = "SELECT AVG(`rating`) FROM `location_rating` WHERE `member` = %s;"
+        sql = (
+            "SELECT AVG(`rating`) FROM `location_rating` WHERE `member` = %s;"
+        )
         values = (uKey,)
         logging.debug(sql % values)
         cursor.execute(sql, values)
@@ -544,7 +549,7 @@ class LeistungsDB:
         cursor = self.mydb.cursor(dictionary=True)
         sql = f"SELECT * FROM (SELECT * FROM `leistungstag` {'WHERE `type` = %s' if type else ''} ORDER BY `date` DESC LIMIT %s) SQ ORDER BY `date`;"
         if type:
-            values = (int(type), int(limit),)
+            values = (int(type), int(limit))
         else:
             values = (int(limit),)
         logging.debug(sql % values)

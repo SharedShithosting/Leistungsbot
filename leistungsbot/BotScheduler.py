@@ -1,3 +1,9 @@
+# #############################################################################
+#  "THE BEER-WARE LICENSE" (Revision 42):                                     #
+#  @eckphi wrote this file. As long as you retain this notice you             #
+#  can do whatever you want with this stuff. If we meet some day, and you think
+#  this stuff is worth it, you can buy me a beer in return Poul-Henning Kamp  #
+# #############################################################################
 from __future__ import annotations
 
 import os
@@ -99,10 +105,10 @@ class Scheduler:
                 self.config["leistungsadmin_id"],
                 f"Schaut so aus ois ob do a alter Leistungstag nuned geclosed worden is...I schlias {location} fia eich.",
             )
-            self.helper.db.closeLeistungstag(leistungstag_key)
+            self.helper.db.closeLeistungstag(prev["key"])
             self.bot.stop_poll(
                 config["leistungschat_id"],
-                leistungstag["poll_id"],
+                prev["poll_id"],
             )
 
 
@@ -111,9 +117,4 @@ if __name__ == "__main__":
         open(os.environ.get("LEISTUNGSBOT_CONFIG_FILE", "BotConfig.yml")),
     )
     s = Scheduler(telebot.TeleBot(config["bot_token"]))
-    s.schedule.every().second.do(p)
-    time.sleep(5)
-    s.schedule.every().second.do(f)
-    time.sleep(5)
-    s.stop()
-    s.send_reminder()
+    s.start()

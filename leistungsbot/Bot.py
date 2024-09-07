@@ -1,24 +1,19 @@
-################################################################################################
-################################################################################################
-# "THE BEER-WARE LICENSE" (Revision 42):
-# @eckphi wrote this file. As long as you retain this notice you
-# can do whatever you want with this stuff. If we meet some day, and you think
-# this stuff is worth it, you can buy me a beer in return Poul-Henning Kamp
-################################################################################################
-################################################################################################
+# #############################################################################
+#  "THE BEER-WARE LICENSE" (Revision 42):                                     #
+#  @eckphi wrote this file. As long as you retain this notice you             #
+#  can do whatever you want with this stuff. If we meet some day, and you think
+#  this stuff is worth it, you can buy me a beer in return Poul-Henning Kamp  #
+# #############################################################################
 from __future__ import annotations
 
-import datetime
+import importlib.resources
 import json
 import logging
 import os
-import random
-import socket
 import time
 from datetime import date
 from datetime import datetime
 from datetime import timedelta
-import importlib.resources
 from pathlib import Path
 
 import telebot
@@ -40,7 +35,9 @@ from leistungsbot.google_place import Openness
 # Now, you can pass storage to bot.
 state_storage = StateMemoryStorage()  # you can init here another storage
 
-# HELP TEXT ------------------------------------------------------------------------|
+#      ┌──────────────────────────────────────────────────────────┐
+#      │                        HELP TEXT                         │
+#      └──────────────────────────────────────────────────────────┘
 """
 User Available Commands:
     1.  /leistungspoll
@@ -64,7 +61,9 @@ Developer Commands: #NOTE: ONLY @eckphi is
     1. /showIds
     2. /botlogs
 """
-# MAIN VARS ------------------------------------------------------------------------|
+#      ┌──────────────────────────────────────────────────────────┐
+#      │                        MAIN VARS                         │
+#      └──────────────────────────────────────────────────────────┘
 """
 THESE ARE THE IMPORTANT VARS FOR POLL BOT
 """
@@ -81,17 +80,21 @@ LEISTUNGSADMIN_ID = config["leistungsadmin_id"]
 # LEISTUNGSCHAT_ID = LEISTUNGSADMIN_ID
 USERNAMES = config["usernames"]  # YOUR USERNAME THIS IS MANDTORY
 
-# ABOVE MAIN VARS -------------------------------------------------------------------|
+#      ┌──────────────────────────────────────────────────────────┐
+#      │                     ABOVE MAIN VARS                      │
+#      └──────────────────────────────────────────────────────────┘
 
 logger = telebot.logger
 telebot.logger.setLevel(logging.DEBUG)  # Outputs debug messages to console.
 
-# States group.
+# ──────────────────────────────────── States Group ──────────────────────
 
 
 class LeistungsState(StatesGroup):
     # Just name variables differently
-    normalLocation = State()  # creating instances of State class is enough from now
+    normalLocation = (
+        State()
+    )  # creating instances of State class is enough from now
     konkurrenzLocation = State()
     zusatzLocation = State()
     searchLocation = State()
@@ -180,7 +183,7 @@ class LeistungsBot:
                                 call.message.chat.id,
                                 "Daun probiern mas numoi...",
                                 reply_markup=self.helper.restore_search_location_button(
-                                    val[0]
+                                    val[0],
                                 ),
                             )
                     else:
@@ -200,7 +203,7 @@ class LeistungsBot:
                         call.message.chat.id,
                         "Welchen Leistungstag willst da anschaun?",
                         reply_markup=self.helper.leistungstag_history_button(
-                            LeistungsTyp(val)
+                            LeistungsTyp(val),
                         ),
                     )
                 elif cmd == "purge_type":
@@ -208,7 +211,7 @@ class LeistungsBot:
                         call.message.chat.id,
                         "Welchen Leistungstag willst löschen?",
                         reply_markup=self.helper.leistungstag_dry_purge_button(
-                            LeistungsTyp(val)
+                            LeistungsTyp(val),
                         ),
                     )
                 elif cmd == "history":
@@ -237,38 +240,43 @@ class LeistungsBot:
                 elif cmd == "open":
                     if (
                         self.bot.get_state(
-                            call.from_user.id, call.message.chat.id
+                            call.from_user.id,
+                            call.message.chat.id,
                         )
                         == LeistungsState.remindePoll.name
                     ):
                         self.process_reminder(call.message, val)
                     elif (
                         self.bot.get_state(
-                            call.from_user.id, call.message.chat.id
+                            call.from_user.id,
+                            call.message.chat.id,
                         )
                         == LeistungsState.closePoll.name
                     ):
                         self.process_closepoll(call.message, val)
                     elif (
                         self.bot.get_state(
-                            call.from_user.id, call.message.chat.id
+                            call.from_user.id,
+                            call.message.chat.id,
                         )
                         == LeistungsState.genericLeistungsmessage.name
                     ):
                         self.process_generic_leistungsmessage(
-                            call.message.reply_to_message, val
+                            call.message.reply_to_message,
+                            val,
                         )
                 elif cmd == "closed":
                     self.bot.reply_to(
                         call.message,
-                        f"Der Poll is scho closed. Willst wirklich on den reminden?",
+                        "Der Poll is scho closed. Willst wirklich on den reminden?",
                         reply_markup=self.helper.confirm_leistungstag_button(
-                            val
+                            val,
                         ),
                     )
                 elif cmd == "no":
                     self.process_generic_leistungsmessage(
-                        call.message.reply_to_message, val
+                        call.message.reply_to_message,
+                        val,
                     )
                 elif cmd == "poll_date":
                     if val:
@@ -281,7 +289,8 @@ class LeistungsBot:
                             self.check_open_hours_before_sending(
                                 call,
                                 datetime.strptime(
-                                    val, self.helper.dateformat
+                                    val,
+                                    self.helper.dateformat,
                                 ).date(),
                             )
                     else:
@@ -352,7 +361,7 @@ class LeistungsBot:
                 )
                 try:
                     group_ids.clear()
-                except:
+                except BaseException:
                     pass
                 bot.reply_to(message, f"An error occurred!\nError: {error}")
                 bot.send_message(
@@ -384,7 +393,7 @@ class LeistungsBot:
 
         @bot.message_handler(commands=["help"])
         def helper(message):
-            return bot.reply_to(message, f"""Eiso i hüf da do ned...""")
+            return bot.reply_to(message, "Eiso i hüf da do ned...")
 
         @bot.message_handler(commands=["purge"])
         def purge(message):
@@ -456,7 +465,7 @@ class LeistungsBot:
             )
 
         @bot.message_handler(commands=["leistungspoll"])
-        def pollNow(message):
+        def poll_now(message):
             try:
                 if not self.helper.sender_has_permission(message):
                     self.bot.reply_to(
@@ -486,7 +495,7 @@ class LeistungsBot:
                 )
 
         @bot.message_handler(commands=["zusatzpoll"])
-        def pollNow(message):
+        def zusatz_poll(message):
             try:
                 if not self.helper.sender_has_permission(message):
                     self.bot.reply_to(
@@ -516,7 +525,7 @@ class LeistungsBot:
                 )
 
         @bot.message_handler(commands=["konkurrenzpoll"])
-        def pollNow(message):
+        def konkurrenz_poll(message):
             try:
                 if not self.helper.sender_has_permission(message):
                     self.bot.reply_to(
@@ -546,9 +555,8 @@ class LeistungsBot:
                 )
 
         @bot.message_handler(commands=["sendreminder"])
-        def pollNow(message: telebot.types.Message):
+        def send_reminder(message: telebot.types.Message):
             try:
-                leistungstage = None
                 self.bot.set_state(
                     message.from_user.id,
                     LeistungsState.remindePoll,
@@ -577,7 +585,7 @@ class LeistungsBot:
 
                     try:
                         target_date = date.fromisoformat(target_date_str)
-                    except:
+                    except BaseException:
                         target_date = None
                         self.bot.send_message(
                             message.chat.id,
@@ -594,7 +602,8 @@ class LeistungsBot:
                     if target_date is not None:
                         successful = (
                             self.try_remind_to_leistungstag_on_a_specific_date(
-                                message, target_date
+                                message,
+                                target_date,
                             )
                         )
                         if not successful:
@@ -618,7 +627,7 @@ class LeistungsBot:
                 )
 
         @bot.message_handler(commands=["closepoll"])
-        def pollNow(message):
+        def close_poll(message):
             try:
                 if not self.helper.sender_has_permission(message):
                     self.bot.reply_to(
@@ -654,7 +663,7 @@ class LeistungsBot:
                 if message.chat.type != "private":
                     bot.reply_to(
                         message,
-                        f"Bist deppad? Des is nix fürn Gruppen chat, du Drecksau.",
+                        "Bist deppad? Des is nix fürn Gruppen chat, du Drecksau.",
                     )
                 else:
                     self.process_send_nudes(message.chat.id)
@@ -670,7 +679,7 @@ class LeistungsBot:
                 )
 
         @bot.message_handler(commands=["add_location"])
-        def request_location(message):
+        def add_location(message):
             try:
                 self.bot.set_state(
                     message.from_user.id,
@@ -693,7 +702,7 @@ class LeistungsBot:
                 )
 
         @bot.message_handler(commands=["remove_location"])
-        def request_location(message):
+        def remove_location_handler(message):
             try:
                 if not self.helper.sender_has_permission(message):
                     self.bot.reply_to(
@@ -724,7 +733,7 @@ class LeistungsBot:
                 )
 
         @bot.message_handler(commands=["history"])
-        def request_location(message):
+        def history(message):
             try:
                 self.process_history(message)
             except Exception as error:
@@ -739,7 +748,7 @@ class LeistungsBot:
                 )
 
         @bot.message_handler(commands=["rate_location"])
-        def request_location(message):
+        def rate_location_handler(message):
             try:
                 if message.chat.type != "private":
                     self.helper.bot.reply_to(
@@ -778,7 +787,7 @@ class LeistungsBot:
                 )
 
         @bot.message_handler(commands=["show_locations"])
-        def request_location(message):
+        def show_locations(message):
             try:
                 bot.reply_to(
                     message,
@@ -844,7 +853,7 @@ class LeistungsBot:
                     f"An error occurred!\nError: {error}",
                 )
 
-        @bot.message_handler(state="*", commands=["cancle"])
+        @bot.message_handler(state="*", commands=["cancel"])
         def cancel(message):
             try:
                 self.process_cancle(message)
@@ -860,7 +869,7 @@ class LeistungsBot:
                 )
 
         @bot.message_handler(state=LeistungsState.normalLocation)
-        def getPollLocation(message):
+        def get_poll_location(message):
             try:
                 location = self.process_poll_location(message)
                 if location:
@@ -887,7 +896,7 @@ class LeistungsBot:
                 )
 
         @bot.message_handler(state=LeistungsState.konkurrenzLocation)
-        def getPollLocation(message):
+        def get_konkurrenz_location(message):
             try:
                 location = self.process_poll_location(message)
                 if location:
@@ -914,7 +923,7 @@ class LeistungsBot:
                 )
 
         @bot.message_handler(state=LeistungsState.zusatzLocation)
-        def getPollLocation(message):
+        def get_zusatz_location(message):
             try:
                 location = self.process_poll_location(message)
                 if location:
@@ -937,7 +946,7 @@ class LeistungsBot:
                 )
 
         @bot.message_handler(state=LeistungsState.removeLocation)
-        def removeLocation(message):
+        def remove_location(message):
             try:
                 self.helper.remove_location(message.text)
                 bot.reply_to(message, "Hab de location murz destroyed!")
@@ -971,7 +980,7 @@ class LeistungsBot:
                 )
 
         @bot.message_handler(state=LeistungsState.rateLocation)
-        def search_location(message):
+        def rate_location(message):
             try:
                 rating = self.helper.get_rating(message.text)
                 leistungstag = self.helper.db.getLeistungsTags(
@@ -986,7 +995,7 @@ class LeistungsBot:
                         message.from_user.id,
                         rating,
                     )
-                except:
+                except BaseException:
                     self.bot.send_message(
                         message.chat.id,
                         "WAHLBETRUG!! Du host schomoi obgstimmt.",
@@ -1009,7 +1018,7 @@ class LeistungsBot:
                 if "nude" in message.text:
                     if message.chat.type != "private":
                         if (datetime.now() - self.last_text_nudes) > timedelta(
-                            days=1
+                            days=1,
                         ):
                             self.last_text_nudes = datetime.now()
                             self.process_send_nudes(message.chat.id)
@@ -1088,7 +1097,8 @@ class LeistungsBot:
             leistungstag["poll_id"],
         )
         self.bot.unpin_chat_message(
-            config["leistungschat_id"], leistungstag["poll_id"]
+            config["leistungschat_id"],
+            leistungstag["poll_id"],
         )
         self.bot.send_message(
             config["leistungschat_id"],
@@ -1132,11 +1142,15 @@ class LeistungsBot:
 
     def process_purge(self, message):
         try:
-            responisibility = importlib.resources.as_file(
-                importlib.resources.files('resources') / 'responisibility.gif'),
-        except:
-            resources = Path(__file__).parent / 'resources'
-            responisibility = resources / 'responisibility.gif'
+            responisibility = (
+                importlib.resources.as_file(
+                    importlib.resources.files("resources")
+                    / "responisibility.gif",
+                ),
+            )
+        except BaseException:
+            resources = Path(__file__).parent / "resources"
+            responisibility = resources / "responisibility.gif"
         self.bot.send_animation(
             message.chat.id,
             telebot.types.InputFile(
@@ -1147,7 +1161,9 @@ class LeistungsBot:
         )
 
     def process_generic_leistungsmessage(
-        self, original_message: telebot.types.Message, leistungstag_id
+        self,
+        original_message: telebot.types.Message,
+        leistungstag_id,
     ):
         command_parts = original_message.text.strip().split()
         msg = " ".join(command_parts[1:])
@@ -1163,11 +1179,12 @@ class LeistungsBot:
             self.bot.send_message(config["leistungschat_id"], msg)
 
         print(
-            f'User {original_message.from_user.username} sent generic message "{msg}"'
+            f'User {original_message.from_user.username} sent generic message "{msg}"',
         )
 
         self.bot.delete_state(
-            original_message.from_user.id, original_message.chat.id
+            original_message.from_user.id,
+            original_message.chat.id,
         )
 
     def check_open_hours_before_sending(self, call, date: date):
@@ -1184,7 +1201,7 @@ class LeistungsBot:
                     "I glaub ned, dass de offn hom. Bist da sicha?\n\n"
                     + open_state[1],
                     reply_markup=self.helper.check_open_hours_keyboard(
-                        "Des passt so, i kenn mi aus"
+                        "Des passt so, i kenn mi aus",
                     ),
                 )
             elif open_state[0] == Openness.SHORT:
@@ -1192,7 +1209,7 @@ class LeistungsBot:
                     call.message.chat.id,
                     "Is da des long gmua?\n\n" + open_state[1],
                     reply_markup=self.helper.check_open_hours_keyboard(
-                        "Jo, passt scho"
+                        "Jo, passt scho",
                     ),
                 )
             elif open_state[0] == Openness.UNKNOWN:
@@ -1200,12 +1217,15 @@ class LeistungsBot:
                     call.message.chat.id,
                     "I was jetzt hod ned, ob de offen hom. Muast söwa schaun.",
                     reply_markup=self.helper.check_open_hours_keyboard(
-                        "Des passt so, i kenn mi aus", "Schaut schlecht aus"
+                        "Des passt so, i kenn mi aus",
+                        "Schaut schlecht aus",
                     ),
                 )
 
     def try_remind_to_leistungstag_on_a_specific_date(
-        self, message: telebot.types.Message, target_date: date
+        self,
+        message: telebot.types.Message,
+        target_date: date,
     ) -> bool:
         """! Reminds to polls of leistungstag on a specific date
 
@@ -1235,7 +1255,7 @@ class LeistungsBot:
         if len(leistungstage) == 1:
             leistunstag = leistungstage[0]
             location_name = self.helper.db.getLocationName(
-                leistunstag["location"]
+                leistunstag["location"],
             )
 
             if leistunstag["closed"] == 1:
@@ -1243,7 +1263,7 @@ class LeistungsBot:
                     message,
                     f"Leistungstag an dem Tog is bei {location_name}, aber da Poll is scho geclosed. Willst wirklich on den reminden?",
                     reply_markup=self.helper.confirm_leistungstag_button(
-                        leistunstag["key"]
+                        leistunstag["key"],
                     ),
                 )
             else:
@@ -1251,14 +1271,14 @@ class LeistungsBot:
                     message,
                     f"Leistungstag an dem Tog is bei {location_name}. Willst on den reminden?",
                     reply_markup=self.helper.confirm_leistungstag_button(
-                        leistunstag["key"]
+                        leistunstag["key"],
                     ),
                 )
 
         else:
             self.bot.send_message(
                 message.chat.id,
-                f"Ein wöd Tog. Do san sogor mehrere Leistungstoge!",
+                "Ein wöd Tog. Do san sogor mehrere Leistungstoge!",
             )
             self.bot.reply_to(
                 message,
@@ -1273,101 +1293,6 @@ class LeistungsBot:
 
     def poll(self):
         self.bot.polling()
-
-
-class GracefulKiller:
-    kill_now = False
-
-    def __init__(self):
-        signal.signal(signal.SIGINT, self.exit_gracefully)
-        signal.signal(signal.SIGTERM, self.exit_gracefully)
-
-    def exit_gracefully(self, *args):
-        self.kill_now = True
-
-
-def watchdog_period():
-    """Return the time (in seconds) that we need to ping within."""
-    val = os.environ.get("WATCHDOG_USEC", None)
-    if not val:
-        logger.error("No watchdog period set in the unit file.")
-        return 1
-    return max([int(val) / 1000000, 1])
-
-
-def notify_socket(clean_environment=True):
-    """Return a tuple of address, socket for future use.
-    clean_environment removes the variables from env to prevent children
-    from inheriting it and doing something wrong.
-    """
-    _empty = None, None
-    address = os.environ.get("NOTIFY_SOCKET", None)
-    if clean_environment:
-        address = os.environ.pop("NOTIFY_SOCKET", None)
-
-    if not address:
-        return _empty
-
-    if len(address) == 1:
-        return _empty
-
-    if address[0] not in ("@", "/"):
-        return _empty
-
-    if address[0] == "@":
-        address = "\0" + str(address[1:])
-
-    # SOCK_CLOEXEC was added in Python 3.2 and requires Linux >= 2.6.27.
-    # It means "close this socket after fork/exec()
-    try:
-        sock = socket.socket(
-            socket.AF_UNIX,
-            socket.SOCK_DGRAM | socket.SOCK_CLOEXEC,
-        )
-    except AttributeError:
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-
-    return address, sock
-
-
-def sd_message(address, sock, message):
-    """Send a message to the systemd bus/socket.
-    message is expected to be bytes.
-    """
-    if not (address and sock and message):
-        return False
-    assert isinstance(message, bytes)
-
-    try:
-        retval = sock.sendto(message, address)
-    except OSError:
-        return False
-    return retval > 0
-
-
-def watchdog_ping(address, sock):
-    """Helper function to send a watchdog ping."""
-    message = b"WATCHDOG=1"
-    return sd_message(address, sock, message)
-
-
-def systemd_ready(address, sock):
-    """Helper function to send a ready signal."""
-    message = b"READY=1"
-    logger.debug("Signaling system ready")
-    return sd_message(address, sock, message)
-
-
-def systemd_stop(address, sock):
-    """Helper function to signal service stopping."""
-    message = b"STOPPING=1"
-    return sd_message(address, sock, message)
-
-
-def systemd_status(address, sock, status):
-    """Helper function to update the service status."""
-    message = ("STATUS=%s" % status).encode("utf8")
-    return sd_message(address, sock, message)
 
 
 def main():

@@ -1,3 +1,9 @@
+# #############################################################################
+#  "THE BEER-WARE LICENSE" (Revision 42):                                     #
+#  @eckphi wrote this file. As long as you retain this notice you             #
+#  can do whatever you want with this stuff. If we meet some day, and you think
+#  this stuff is worth it, you can buy me a beer in return Poul-Henning Kamp  #
+# #############################################################################
 from __future__ import annotations
 
 import datetime
@@ -105,33 +111,69 @@ class Places:
         if place_detail["status"] != "OK" or len(place_detail["result"]) == 0:
             return (Openness.UNKNOWN, "")
 
-        opening_hours = place_detail["result"]["opening_hours"][
-            "periods"
-        ]  # Returns something like this: [{'close': {'day': 1, 'time': '1500'}, 'open': {'day': 1, 'time': '1200'}}, {'close': {'day': 1, 'time': '2230'}, 'open': {'day': 1, 'time': '1700'}}, {'close': {'day': 2, 'time': '1500'}, 'open': {'day': 2, 'time': '1200'}}, {'close': {'day': 2, 'time': '2230'}, 'open': {'day': 2, 'time': '1800'}}, {'close': {'day': 3, 'time': '1500'}, 'open': {'day': 3, 'time': '1200'}}, {'close': {'day': 3, 'time': '2230'}, 'open': {'day': 3, 'time': '1700'}}, {'close': {'day': 4, 'time': '1500'}, 'open': {'day': 4, 'time': '1200'}}, {'close': {'day': 4, 'time': '2230'}, 'open': {'day': 4, 'time': '1700'}}, {'close': {'day': 5, 'time': '1500'}, 'open': {'day': 5, 'time': '1200'}}, {'close': {'day': 5, 'time': '2230'}, 'open': {'day': 5, 'time': '1700'}}, {'close': {'day': 6, 'time': '2230'}, 'open': {'day': 6, 'time': '1600'}}
+        opening_hours = place_detail["result"]["opening_hours"]["periods"]
+        # Returns something like this:
+        # [
+        #     {
+        #         "close": {
+        #             "day": 1,
+        #             "time": "1500"
+        #         },
+        #         "open": {
+        #             "day": 1,
+        #             "time": "1200"
+        #         }
+        #     },
+        #     {
+        #         "close": {
+        #             "day": 1,
+        #             "time": "2230"
+        #         },
+        #         "open": {
+        #             "day": 1,
+        #             "time": "1700"
+        #         }
+        #     },
+        #     {
+        #         "close": {
+        #             "day": 2,
+        #             "time": "1500"
+        #         },
+        #         "open": {
+        #             "day": 2,
+        #             "time": "1200"
+        #         }
+        #     }
+        # ...
+        # ]
 
         wd = Weekday.fromPythonWeekday(
-            target_day.weekday()
+            target_day.weekday(),
         ).toGooglePlacesWeekday()
 
         # Get opening hour for tuesday == 2
         target_day_opening_hours = filter(
-            lambda entry: entry["open"]["day"] == wd, opening_hours
+            lambda entry: entry["open"]["day"] == wd,
+            opening_hours,
         )
 
         hours = []
 
-        # TODO: Transform weekday and time to actual datetimes, for easier handling
+        # TODO: Transform weekday and time to actual datetimes,
+        #  for easier handling
         for oh in target_day_opening_hours:
             open = datetime.datetime.combine(
                 target_day + datetime.timedelta(days=oh["open"]["day"] - wd),
                 datetime.time(
-                    int(oh["open"]["time"][0:2]), int(oh["open"]["time"][2:4])
+                    int(oh["open"]["time"][0:2]),
+                    int(oh["open"]["time"][2:4]),
                 ),
             )
             close = datetime.datetime.combine(
                 target_day + datetime.timedelta(days=oh["close"]["day"] - wd),
                 datetime.time(
-                    int(oh["close"]["time"][0:2]), int(oh["close"]["time"][2:4])
+                    int(oh["close"]["time"][0:2]),
+                    int(oh["close"]["time"][2:4]),
                 ),
             )
 
@@ -144,7 +186,7 @@ class Places:
             hours.append(Hours(open, close))
 
         weekday_text = "\n".join(
-            place_detail["result"]["opening_hours"]["weekday_text"]
+            place_detail["result"]["opening_hours"]["weekday_text"],
         )
 
         if len(hours) < 1:
@@ -170,6 +212,7 @@ if __name__ == "__main__":
         print(i)
         print(
             place.checkOpenHours(
-                r[0]["place_id"], datetime.date.fromisoformat("2023-05-16")
-            )
+                r[0]["place_id"],
+                datetime.date.fromisoformat("2023-05-16"),
+            ),
         )

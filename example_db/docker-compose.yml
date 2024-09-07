@@ -1,6 +1,5 @@
 # Use root/example as user/password credentials
 version: '3.1'
-
 services:
   db:
     image: mariadb
@@ -15,7 +14,6 @@ services:
     volumes:
       - ./leistung_db.sql:/docker-entrypoint-initdb.d/leistung_db.sql
       - db_storage:/var/lib/mysql
-
   phpmyadmin:
     image: phpmyadmin
     restart: always
@@ -23,6 +21,5 @@ services:
       - 8080:80
     environment:
       - PMA_ARBITRARY=1
-
 volumes:
   db_storage:

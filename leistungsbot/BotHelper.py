@@ -1,3 +1,9 @@
+# #############################################################################
+#  "THE BEER-WARE LICENSE" (Revision 42):                                     #
+#  @eckphi wrote this file. As long as you retain this notice you             #
+#  can do whatever you want with this stuff. If we meet some day, and you think
+#  this stuff is worth it, you can buy me a beer in return Poul-Henning Kamp  #
+# #############################################################################
 from __future__ import annotations
 
 import json
@@ -17,7 +23,6 @@ from telebot.types import InlineKeyboardButton
 from telebot.types import InlineKeyboardMarkup
 from telebot.types import KeyboardButton
 from telebot.types import ReplyKeyboardMarkup
-from telebot.util import quick_markup
 from telegram_bot_calendar import DetailedTelegramCalendar
 from telegram_bot_calendar import LSTEP
 
@@ -47,9 +52,8 @@ class Helper:
             try:
                 data = json.loads(callback.data)
                 cmd = [*data][0]
-                start = "🍻"
                 return cmd.startswith("🍻")
-            except:
+            except BaseException:
                 return False
 
     def escape_markdown(self, text: str, markdown_version: int = 2):
@@ -118,15 +122,16 @@ class Helper:
                     InlineKeyboardButton(
                         self.db.getLocationName(leistungstag["location"]),
                         callback_data=json.dumps(
-                            {callback_key: leistungstag["key"]}
+                            {callback_key: leistungstag["key"]},
                         ),
                     ),
                 )
         if additional_button:
             markup.add(
                 InlineKeyboardButton(
-                    "Nö", callback_data=json.dumps({"🍻no": None})
-                )
+                    "Nö",
+                    callback_data=json.dumps({"🍻no": None}),
+                ),
             )
         return markup
 
@@ -152,20 +157,22 @@ class Helper:
         return markup
 
     def check_open_hours_keyboard(
-        self, agree_message, abort_message="Hoitaus. Abort!"
+        self,
+        agree_message,
+        abort_message="Hoitaus. Abort!",
     ):
         markup = InlineKeyboardMarkup(row_width=1)
         markup.add(
             InlineKeyboardButton(
                 agree_message,
                 callback_data=json.dumps({"🍻open_hours_checked": True}),
-            )
+            ),
         )
         markup.add(
             InlineKeyboardButton(
                 abort_message,
                 callback_data=json.dumps({"🍻open_hours_checked": False}),
-            )
+            ),
         )
         return markup
 
@@ -335,7 +342,7 @@ class Helper:
         if not date:
             date = self.next_leistungstag()
         date_str = date.strftime(self.dateformat)
-        close_date = date - timedelta(hours=12)
+        # close_date = date - timedelta(hours=12)
         info = self.db.getLocationInfo(location)
         venue_id = self.bot.send_venue(
             chat_id,
@@ -353,7 +360,7 @@ class Helper:
         elif type == LeistungsTyp.ZUSATZ:
             question = f'Leistungstag Zusatztermin {count}: am {date_str} in "{location}"'
         else:
-            question = f"Keine Ahnung wos wia grad polln..."
+            question = "Keine Ahnung wos wia grad polln..."
         poll_message = self.bot.send_poll(
             chat_id,
             question,
@@ -455,7 +462,7 @@ class Helper:
 {self.get_stars(rating)}
 {info.get('address')}
 {info.get('phone')}
-{info.get('url')}"""
+{info.get('url')}""",
             )
         )
 
@@ -475,27 +482,7 @@ class Helper:
                 f"""
 {info.get('address')}
 {info.get('phone')}
-{info.get('url')}"""
-            )
-        )
-        self.bot.send_message(
-            chat_id,
-            message,
-            parse_mode="MarkdownV2",
-        )
-
-    def send_rating_info(self, chat_id):
-        key = self.db.getLeistungstag(key)
-        info = self.db.getLocationInfoByKey(location_key)
-        self.send_location_info(chat_id, info["google-place-id"])
-
-        message = (
-            f"""*{self.escape_markdown(info.get('name'))}*"""
-            + self.escape_markdown(
-                f"""
-{info.get('address')}
-{info.get('phone')}
-{info.get('url')}"""
+{info.get('url')}""",
             )
         )
         self.bot.send_message(
@@ -517,7 +504,7 @@ class Helper:
 {self.get_stars(rating)}
 {info.get('address')}
 {info.get('phone')}
-{info.get('url')}"""
+{info.get('url')}""",
             )
         )
 
@@ -536,14 +523,14 @@ class Helper:
                 self.config["leistungschat_id"],
                 ld["poll_id"],
             )
-        except:
+        except BaseException:
             pass
         try:
             res &= self.bot.delete_message(
                 self.config["leistungschat_id"],
                 ld["venue_id"],
             )
-        except:
+        except BaseException:
             pass
         self.db.setLocationVisitedStateKey(ld["location"], False)
         self.db.removeLeistungstag(leistungstag_key)
@@ -601,7 +588,7 @@ The error was informed to @eckphi""",
             InlineKeyboardButton(
                 next_tuseday.strftime(self.dateformat),
                 callback_data=json.dumps(
-                    {"🍻poll_date": next_tuseday.strftime(self.dateformat)}
+                    {"🍻poll_date": next_tuseday.strftime(self.dateformat)},
                 ),
             ),
         )
@@ -614,11 +601,16 @@ The error was informed to @eckphi""",
         return markup
 
     def check_open_hours(
-        self, location: str, date: date, time: time = time(19, 00)
+        self,
+        location: str,
+        date: date,
+        time: time = time(19, 00),
     ):
         place_info = self.db.getLocationInfo(location)
         return self.google.checkOpenHours(
-            place_info["google-place-id"], date, time
+            place_info["google-place-id"],
+            date,
+            time,
         )
 
 
