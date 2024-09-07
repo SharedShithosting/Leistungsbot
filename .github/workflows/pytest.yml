@@ -101,9 +101,21 @@ jobs:
       # so this line is super-simple. But it could be as complex as you need.
       - run: poetry run pytest --junitxml=reports/junit/junit.xml
       # Generate badges
-      - run: poetry run genbadge tests
+      - run: poetry run genbadge tests -o reports/badges/tests-badge.svg
+      # Run coverage tests
+      - run: poetry run coverage run -m pytest
+      - run: poetry run coverage report -m
+      - run: poetry run coverage xml -o reports/coverage/coverage.xml
+      - run: poetry run coverage html -d reports/coverage
+      # Generate badges
+      - run: poetry run genbadge coverage -o reports/badges/coverage-badge.svg
+      # flake8
+      - run: poetry run flake8 leistungsbot --exit-zero --format=html --htmldir ./reports/flake8 --statistics --tee --output-file reports/flake8/flake8stats.txt
+      # Generate badges
+      - run: poetry run genbadge flake8 -o reports/badges/flake8-badge.svg
       - name: Archive badges
+        if: "${{ github.ref_name  == 'main' }}" # This step will only run if `[deploy]` is found
         uses: actions/upload-artifact@v4
         with:
           name: tests-badge
-          path: /home/runner/work/Leistungsbot/Leistungsbot/tests-badge.svg
+          path: badges
