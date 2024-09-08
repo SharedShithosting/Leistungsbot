@@ -15,10 +15,10 @@ template = {
     "google": str,
     "bot_token": str,
     "api_hash": str,
-    "api_id": int,
-    "chat_id": int,
-    "leistungschat_id": int,
-    "leistungsadmin_id": int,
+    "api_id": [int, str],
+    "chat_id": [int, str],
+    "leistungschat_id": [int, str],
+    "leistungsadmin_id": [int, str],
     "usernames": confuse.StrSeq(),
 }
 
