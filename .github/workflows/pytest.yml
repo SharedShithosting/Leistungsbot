@@ -117,5 +117,5 @@ jobs:
         if: "${{ github.ref_name  == 'main' }}" # This step will only run if `[deploy]` is found
         uses: actions/upload-artifact@v4
         with:
-          name: tests-badge
+          name: test-reports
           path: reports
