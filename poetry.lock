@@ -798,12 +798,12 @@ windows-terminal = ["colorama (>=0.4.6)"]
 
 [[package]]
 name = "pytelegrambotapi"
-version = "4.22.1"
+version = "4.11.0"
 description = "Python Telegram bot api."
 optional = false
-python-versions = ">=3.8"
+python-versions = "*"
 files = [
-    {file = "pytelegrambotapi-4.22.1-py3-none-any.whl", hash = "sha256:58a4bc11b054683ba4ef43452e125c80786bbeffd1ba08dfa45291f56e5d08c4"},
+    {file = "pyTelegramBotAPI-4.11.0.tar.gz", hash = "sha256:dba9184bae3bb6a56c70ad3216202cd734a63b6b508ec1b1a2f23afa399d3c47"},
 ]
 
 [package.dependencies]
@@ -811,10 +811,11 @@ requests = "*"
 
 [package.extras]
 aiohttp = ["aiohttp"]
+aioredis = ["aioredis"]
 coloredlogs = ["coloredlogs"]
 fastapi = ["fastapi"]
 json = ["ujson"]
-pil = ["pillow"]
+pil = ["Pillow"]
 psutil = ["psutil"]
 redis = ["redis (>=3.4.1)"]
 uvicorn = ["uvicorn"]
@@ -1000,6 +1001,20 @@ files = [
 ]
 
 [[package]]
+name = "telemulator3"
+version = "1.5"
+description = "Mocked Telegram Bot API elements for unit tests of a bot based on the pyTelegramBotAPI library."
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "telemulator3-1.5-py3-none-any.whl", hash = "sha256:fde2e854bc174d6408e26069010238848931c3fb272cb00312dec4ba56b106cd"},
+    {file = "telemulator3-1.5.tar.gz", hash = "sha256:130e40a8ab1ca7f90b631659da306bb6cbfa1d682b664244621a3361dea02f43"},
+]
+
+[package.dependencies]
+pyTelegramBotAPI = "<=4.11.0"
+
+[[package]]
 name = "urllib3"
 version = "2.2.2"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
@@ -1039,4 +1054,4 @@ test = ["covdefaults (>=2.3)", "coverage (>=7.2.7)", "coverage-enable-subprocess
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "fb548a08879f08bfece2e7d2979bf227591cfee9979f72853a7797f4ad005ed3"
+content-hash = "c676bfbac62ed903b415d078353335367780f42145b2ea360fb9dfb82555140e"
