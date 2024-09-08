@@ -1,5 +1,6 @@
-![pipeline status][1] ![coverage report][2]
-[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/SharedShithosting/Leistungsbot/main.svg?badge_token=SY5bixrKQgiF9Y7vEgXdbg)](https://results.pre-commit.ci/latest/github/SharedShithosting/Leistungsbot/main?badge_token=SY5bixrKQgiF9Y7vEgXdbg)
+[![Tests Status](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/pytest.yml/reports/junit/junit-badge.svg?dummy=8484744)](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/pytest.yml/reports/junit/report.html)
+[![Docker Image CI](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/docker-image.yml/badge.svg)](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/docker-image.yml)
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/SharedShithosting/Leistungsbot/main.svg)](https://results.pre-commit.ci/latest/github/SharedShithosting/Leistungsbot/main)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 
