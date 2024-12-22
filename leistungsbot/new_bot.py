@@ -34,7 +34,7 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 async def send_nudes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    old.process_send_nudes(update.message)
+    old.process_send_nudes(update.effective_chat.id)
     return ConversationHandler.END
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
