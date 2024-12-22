@@ -54,7 +54,7 @@ def create_bot(token: str):
             CommandHandler("konkurenzpoll", konkurenzpoll),
             CommandHandler("help", help),
             CommandHandler("sendnudes", send_nudes),
-            CommandHandler("histroy", leistungsbot.handler.history_send_kind),
+            CommandHandler("history", leistungsbot.handler.history_send_kind),
         ],
         states={
             ConversationState.HISTORY_SELECT_KIND: [CallbackQueryHandler(leistungsbot.handler.history_send_leistungstag)],
