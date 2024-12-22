@@ -40,6 +40,10 @@ async def send_nudes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
+async def timeout(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await context.bot.send_message(update.effective_chat.id, "Hiaz denkst nummoi noch, wost eigentlich wüst und donn fongst nummoi vo vorn on!")
+    return ConversationHandler.END
+
 def create_bot(token: str):
     application = Application.builder().token(token).build()
 
@@ -53,10 +57,11 @@ def create_bot(token: str):
             CommandHandler("histroy", leistungsbot.handler.history_send_kind),
         ],
         states={
-            ConversationState.HISTORY_SELECT_KIND: [CallbackQueryHandler(leistungsbot.handler.history_send_leistungstag)]
+            ConversationState.HISTORY_SELECT_KIND: [CallbackQueryHandler(leistungsbot.handler.history_send_leistungstag)],
+            ConversationHandler.TIMEOUT: [MessageHandler(None, timeout), CallbackQueryHandler(timeout)]
         },
         fallbacks=[CommandHandler("cancel", cancel)],
-        conversation_timeout=timedelta(minutes=5)
+        conversation_timeout=timedelta(seconds=30)
     )
 
     application.add_handler(conv_handler)
