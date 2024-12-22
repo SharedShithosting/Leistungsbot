@@ -40,6 +40,7 @@ async def send_nudes(update: Update, context: LeistungsbotContext) -> int:
     return ConversationHandler.END
 
 async def cancel(update: Update, context: LeistungsbotContext) -> int:
+    await context.bot.send_message(update.effective_chat.id, "Donn hoid ned. Brauchst sunst nu wos?")
     return ConversationHandler.END
 
 async def timeout(update: Update, context: LeistungsbotContext) -> int:
