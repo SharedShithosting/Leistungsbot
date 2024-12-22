@@ -23,10 +23,6 @@ from leistungsbot.LeistungbotContext import LeistungsbotContext, BotContext
 
 import leistungsbot.handler
 
-old = LeistungsBot()
-
-
-
 async def leistungspoll(update: Update, context: LeistungsbotContext) -> int:
     return ConversationHandler.END
 
@@ -40,7 +36,7 @@ async def help(update: Update, context: LeistungsbotContext) -> int:
     return ConversationHandler.END
 
 async def send_nudes(update: Update, context: LeistungsbotContext) -> int:
-    old.process_send_nudes(update.effective_chat.id)
+    context.bot_data["oldlb"].process_send_nudes(update.effective_chat.id)
     return ConversationHandler.END
 
 async def cancel(update: Update, context: LeistungsbotContext) -> int:

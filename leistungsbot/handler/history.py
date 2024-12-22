@@ -6,15 +6,12 @@ from telegram.ext import (
     ConversationHandler,
 )
 
-
 from leistungsbot.ConverstaionState import ConversationState
 from leistungsbot.Bot import LeistungsBot
 from leistungsbot.LeistungbotContext import LeistungsbotContext
 
-oldlb = LeistungsBot()
-
 async def history_send_kind(update: Update, context: LeistungsbotContext) -> int:
-    oldlb.process_history(update.message)
+    context.bot_data["oldlb"].process_history(update.message)
     return ConversationState.HISTORY_SELECT_KIND
 
 async def history_send_leistungstag(update: Update, context: LeistungsbotContext) -> int:
