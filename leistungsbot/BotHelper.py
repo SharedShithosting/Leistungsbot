@@ -321,6 +321,7 @@ class Helper:
             chat_id,
             gif,
             caption="brought to you by Maxmaier",
+            has_spoiler=True,
         )
 
     def next_leistungstag(self):

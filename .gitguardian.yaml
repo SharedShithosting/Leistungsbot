@@ -1,0 +1,5 @@
+secret:
+  ignored_matches:
+    - match: 5abf8349eb0f18d597f0a1e12088bf779f421def6936d20365a4b1c23c7a74af
+      name: example_password
+version: 2
