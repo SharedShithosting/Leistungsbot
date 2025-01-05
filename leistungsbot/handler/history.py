@@ -6,7 +6,7 @@ from telegram.ext import (
     ConversationHandler,
 )
 
-from leistungsbot.ConverstaionState import ConversationState
+from leistungsbot.Conversation import ConversationState
 from leistungsbot.Bot import LeistungsBot
 from leistungsbot.LeistungbotContext import LeistungsbotContext
 

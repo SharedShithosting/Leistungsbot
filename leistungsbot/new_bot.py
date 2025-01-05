@@ -18,19 +18,11 @@ from telegram.ext import (
 
 from leistungsbot import leistungs_config as lc
 from leistungsbot.Bot import LeistungsBot
-from leistungsbot.ConverstaionState import ConversationState
+from leistungsbot.Conversation import ConversationState
 from leistungsbot.LeistungbotContext import LeistungsbotContext, BotContext
 
 import leistungsbot.handler
 
-async def leistungspoll(update: Update, context: LeistungsbotContext) -> int:
-    return ConversationHandler.END
-
-async def zusatzpoll(update: Update, context: LeistungsbotContext) -> int:
-    return ConversationHandler.END
-
-async def konkurenzpoll(update: Update, context: LeistungsbotContext) -> int:
-    return ConversationHandler.END
 
 async def help(update: Update, context: LeistungsbotContext) -> int:
     return ConversationHandler.END
@@ -47,15 +39,15 @@ async def timeout(update: Update, context: LeistungsbotContext) -> int:
     await context.bot.send_message(update.effective_chat.id, "Hiaz denkst nummoi noch, wost eigentlich wüst und donn fongst nummoi vo vorn on!")
     return ConversationHandler.END
 
-def create_bot(token: str):
+def start_bot(token: str) -> None:
     application = Application.builder().token(token).context_types(ContextTypes(context=LeistungsbotContext, bot_data=BotContext)).build()
     application.bot_data["oldlb"] = LeistungsBot()
 
     conv_handler = ConversationHandler(
         entry_points=[
-            CommandHandler("leistungspoll", leistungspoll),
-            CommandHandler("zusatzpoll", zusatzpoll),
-            CommandHandler("konkurenzpoll", konkurenzpoll),
+            CommandHandler("leistungspoll", leistungsbot.handler.leistungspoll),
+            CommandHandler("zusatzpoll", leistungsbot.handler.zusatzpoll),
+            CommandHandler("konkurenzpoll", leistungsbot.handler.konkurenzpoll),
             CommandHandler("help", help),
             CommandHandler("sendnudes", send_nudes),
             CommandHandler("history", leistungsbot.handler.history_send_kind),
