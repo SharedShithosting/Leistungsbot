@@ -82,6 +82,7 @@ class LeistungsState(StatesGroup):
     historyLeistungstag = State()
     remindePoll = State()
     closePoll = State()
+    sneakyClosePoll = State()
     removeLocation = State()
     rateLocation = State()
     genericLeistungsmessage = State()
@@ -239,6 +240,14 @@ class LeistungsBot:
                         == LeistungsState.closePoll.name
                     ):
                         self.process_closepoll(call.message, val)
+                    elif (
+                        self.bot.get_state(
+                            call.from_user.id,
+                            call.message.chat.id,
+                        )
+                        == LeistungsState.sneakyClosePoll.name
+                    ):
+                        self.process_closepoll(call.message, val, True)
                     elif (
                         self.bot.get_state(
                             call.from_user.id,
@@ -629,6 +638,37 @@ class LeistungsBot:
                 self.bot.reply_to(
                     message,
                     "Welchen Poll wüst closen?",
+                    reply_markup=self.helper.open_polls_button(),
+                )
+            except Exception as error:
+                bot.send_message(
+                    lc.config["chat_id"],
+                    f"Hi Devs!!\nHandle This Error plox\n{error}",
+                )
+                bot.reply_to(message, f"An error occurred!\nError: {error}")
+                bot.send_message(
+                    lc.config["chat_id"],
+                    f"An error occurred!\nError: {error}",
+                )
+
+        @bot.message_handler(commands=["sneaky_closepoll"])
+        def sneaky_close_poll(message: telebot.types.Message) -> None:
+            try:
+                if not self.helper.sender_has_permission(message):
+                    self.bot.reply_to(
+                        message,
+                        "Diese Funktion ist nicht für den Pöbel gedacht.",
+                    )
+                    return
+
+                self.bot.set_state(
+                    message.from_user.id,
+                    LeistungsState.sneakyClosePoll,
+                    message.chat.id,
+                )
+                self.bot.reply_to(
+                    message,
+                    "Welchen Poll wüst sneaky closen?",
                     reply_markup=self.helper.open_polls_button(),
                 )
             except Exception as error:
@@ -1074,33 +1114,63 @@ class LeistungsBot:
         )
         self.bot.send_message(message.chat.id, "Da Reminder is draußen!")
 
-    def process_closepoll(self, message, leistungstag_key):
-        if not self.helper.sender_has_permission(message):
-            self.bot.reply_to(
-                message,
-                "Diese Funktion ist nicht für den Pöbel gedacht.",
-            )
-            return
+    def process_closepoll(
+        self,
+        message: telebot.types.Message,
+        leistungstag_key: int,
+        sneaky: bool = False,
+    ) -> None:
+        # Check does not work when in callback
+        # if not self.helper.sender_has_permission(message):
+        #     self.bot.reply_to(
+        #         message,
+        #         "Diese Funktion ist nicht für den Pöbel gedacht.",
+        #     )
+        #     return
 
         leistungstag = self.helper.db.getLeistungstag(leistungstag_key)
         self.helper.db.closeLeistungstag(leistungstag_key)
-        self.bot.stop_poll(
-            lc.config["leistungschat_id"],
-            leistungstag["poll_id"],
-        )
-        self.bot.unpin_chat_message(
-            lc.config["leistungschat_id"],
-            leistungstag["poll_id"],
-        )
-        self.bot.send_message(
-            lc.config["leistungschat_id"],
-            "Schluss, aus, vorbei die Wahl is glaufen und für de de abgstimmt haben is a Platzerl reserviert.",
-            reply_to_message_id=leistungstag["poll_id"],
-        )
-        self.bot.send_message(
-            message.chat.id,
-            "De Poll is zua. I hoff für dich d Reservierung is scho erledigt!",
-        )
+        try:
+            self.bot.stop_poll(
+                lc.config["leistungschat_id"],
+                leistungstag["poll_id"],
+            )
+        except BaseException:
+            pass
+        try:
+            self.bot.unpin_chat_message(
+                lc.config["leistungschat_id"],
+                leistungstag["poll_id"],
+            )
+        except BaseException:
+            pass
+        if not sneaky:
+            self.bot.send_message(
+                lc.config["leistungschat_id"],
+                "Schluss, aus, vorbei die Wahl is glaufen und für de de abgstimmt haben is a Platzerl reserviert.",
+                reply_to_message_id=leistungstag["poll_id"],
+            )
+            self.bot.send_message(
+                message.chat.id,
+                "De Poll is zua. I hoff für dich d Reservierung is scho erledigt!",
+            )
+        else:
+            try:
+                sneakiely = (
+                    importlib.resources.as_file(
+                        importlib.resources.files("resources") / "sneaky.gif",
+                    ),
+                )
+            except BaseException:
+                resources = Path(__file__).parent / "resources"
+                sneakiely = resources / "sneaky.gif"
+            self.bot.send_animation(
+                message.chat.id,
+                animation=telebot.types.InputFile(
+                    sneakiely,
+                ),
+                caption="De Poll is zua. I hoff für dich d Reservierung is scho erledigt!",
+            )
 
     def process_check_open_hours(self, callback, open_hours_correct):
         if open_hours_correct:
