@@ -30,6 +30,7 @@ from leistungsbot.BotHelper import LeistungsTyp
 from leistungsbot.BotHelper import PersistantLeistungsTagPoller
 from leistungsbot.BotScheduler import Scheduler
 from leistungsbot.google_place import Openness
+from leistungsbot.package import _version
 
 # States storage
 # Now, you can pass storage to bot.
@@ -55,6 +56,7 @@ User Available Commands:
     13. /location_info
     14. /zusatzpoll
     15. /konkurrenzpoll
+    16. /version
 
 Developer Commands: #NOTE: ONLY @eckphi is
  allowed for these comands:
@@ -432,7 +434,7 @@ class LeistungsBot:
         def alive(message):
             bot.reply_to(
                 message,
-                f"Hey {message.from_user.username}, Ready To Serve You",
+                f"Hey {message.from_user.username}, Ready To Serve You in version {_version.__version__}",
             )
 
         @bot.message_handler(commands=["start"])
@@ -1009,6 +1011,13 @@ class LeistungsBot:
                     f"Hi Devs!!\nHandle This Error (text)\n{error}",
                 )
                 bot.reply_to(message, f"An error occurred!\nError: {error}")
+
+        @bot.message_handler(commands=["version"])
+        def version(message):
+            bot.reply_to(
+                message,
+                f"LeistungsBot - {_version.__version__}",
+            )
 
     def process_cancle(self, message):
         self.bot.send_message(
