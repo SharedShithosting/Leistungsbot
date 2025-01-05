@@ -12,7 +12,7 @@ services:
       MARIADB_PASSWORD: 8JpoPax7TEyGCY
       MARIADB_DATABASE: leistungs_db
     volumes:
-      - ./leistung_db.sql:/docker-entrypoint-initdb.d/leistung_db.sql
+      - ./leistung_db.sql:/docker-entrypoint-initdb.d/leistung_db.sql:Z
       - db_storage:/var/lib/mysql
   phpmyadmin:
     image: phpmyadmin
