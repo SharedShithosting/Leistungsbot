@@ -532,4 +532,67 @@ INSERT INTO `participants` (`key`, `member`, `event`) VALUES
 DROP TABLE IF EXISTS `events`;
 CREATE ALGORITHM=UNDEFINED SQL SECURITY DEFINER VIEW `events` AS select timestamp(`leistungstag`.`date`,'19:00:00') AS `start`,timestamp(`leistungstag`.`date`,'22:00:00') AS `end`,`leistungstag`.`type` AS `type`,`leistungstag`.`closed` AS `closed`,`leistungstag`.`location` AS `location` from (`leistungstag` join `locations` `l` on(`leistungstag`.`location` = `l`.`key`));
 
+DROP TABLE IF EXISTS `leistungs_view`;
+CREATE VIEW leistungs_view AS
+SELECT
+  ROW_NUMBER() OVER (
+    ORDER BY
+      `date` ASC
+  ) AS `number`,
+  `key`,
+  `location`,
+  `date`,
+  `poll_id`,
+  `venue_id`,
+  `type`,
+  `closed`
+FROM
+  `leistungstag`
+WHERE
+  `type` = '1'
+ORDER BY
+  `date`;
+
+DROP TABLE IF EXISTS `konkurrenz_view`;
+CREATE VIEW konkurrenz_view AS
+SELECT
+  ROW_NUMBER() OVER (
+    ORDER BY
+      `date` ASC
+  ) AS `number`,
+  `key`,
+  `location`,
+  `date`,
+  `poll_id`,
+  `venue_id`,
+  `type`,
+  `closed`
+FROM
+  `leistungstag`
+WHERE
+  `type` = '2'
+ORDER BY
+  `date`;
+
+DROP TABLE IF EXISTS `zusatz_view`;
+CREATE VIEW zusatz_view AS
+SELECT
+  ROW_NUMBER() OVER (
+    ORDER BY
+      `date` ASC
+  ) AS `number`,
+  `key`,
+  `location`,
+  `date`,
+  `poll_id`,
+  `venue_id`,
+  `type`,
+  `closed`
+FROM
+  `leistungstag`
+WHERE
+  `type` = '3'
+ORDER BY
+  `date`;
+
 -- 2024-09-07 15:22:28
