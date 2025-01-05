@@ -665,6 +665,17 @@ class LeistungsDB:
         cursor.execute(sql, values)
         self.mydb.commit()
 
+    def getMostRecentLeistungstag(self) -> dict:
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
+        cursor = self.mydb.cursor(dictionary=True)
+        sql = "SELECT * FROM `leistungstag` ORDER BY `date` DESC LIMIT 1"
+        cursor.execute(sql)
+        return self.convert(cursor.fetchone(), True)
+
 
 if __name__ == "__main__":
     logging.basicConfig(filename="myapp.log", level=logging.DEBUG)
