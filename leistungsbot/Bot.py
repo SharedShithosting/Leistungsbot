@@ -86,6 +86,8 @@ class LeistungsState(StatesGroup):
     removeLocation = State()
     rateLocation = State()
     genericLeistungsmessage = State()
+    switcherooLeistungstagNumber = State()
+    switcherooAlternateLocation = State()
 
 
 class LeistungsBot:
@@ -1036,6 +1038,40 @@ class LeistungsBot:
                     lc.config["chat_id"],
                     f"An error occurred!\nError: {error}",
                 )
+
+        @bot.message_handler(state=LeistungsState.switcherooLeistungstagNumber)
+        def switcheroo_leistungstag_number(message: telebot.types.Message) -> None:
+            lt = self.helper.db.getMostRecentLeistungstag()
+            print(f'Location {lt["location"]}')
+
+            # TODO: Check if leistungstag exists
+            # TODO: Edit poll message, if possible
+
+            self.bot.send_message(message.chat.id, "Passt. Wo schau ma stottdessen hin?", reply_markup=self.helper.location_keyboard())
+            self.bot.set_state(message.from_user.id, LeistungsState.switcherooAlternateLocation, message.chat.id)
+
+            return
+
+        @bot.message_handler(state=LeistungsState.switcherooAlternateLocation)
+        def switcheroo_alternate_location(message: telebot.types.Message) -> None:
+            location = message.text.strip()
+            # check if location exists in database
+            info = self.helper.db.getLocationInfo(location)
+
+        @bot.message_handler(commands="switcheroo")
+        def switcheroo(message: telebot.types.Message) -> None:
+            if not self.helper.sender_has_permission(message):
+                self.bot.reply_to(
+                    message,
+                    "Diese Funktion ist nicht für den Pöbel gedacht.",
+                )
+
+            self.bot.send_message(message.chat.id, "Wechan muastn ändern? Schick ma de nummer und i schau wos i doan konn.")
+            self.bot.set_state(
+                message.from_user.id,
+                LeistungsState.switcherooLeistungstagNumber,
+                message.chat.id,
+            )
 
         # @bot.message_handler(content_types=["text"])
         # def new_msg(message):
