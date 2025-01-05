@@ -13,7 +13,6 @@ import logging
 import time
 from datetime import date
 from datetime import datetime
-from datetime import timedelta
 from pathlib import Path
 
 import telebot
@@ -992,25 +991,25 @@ class LeistungsBot:
                     f"An error occurred!\nError: {error}",
                 )
 
-        @bot.message_handler(content_types=["text"])
-        def new_msg(message):
-            try:
-                if "nude" in message.text:
-                    if message.chat.type != "private":
-                        if (datetime.now() - self.last_text_nudes) > timedelta(
-                            days=1,
-                        ):
-                            self.last_text_nudes = datetime.now()
-                            self.process_send_nudes(message.chat.id)
-                    else:
-                        self.process_send_nudes(message.chat.id)
+        # @bot.message_handler(content_types=["text"])
+        # def new_msg(message):
+        #     try:
+        #         if "nude" in message.text:
+        #             if message.chat.type != "private":
+        #                 if (datetime.now() - self.last_text_nudes) > timedelta(
+        #                     days=1,
+        #                 ):
+        #                     self.last_text_nudes = datetime.now()
+        #                     self.process_send_nudes(message.chat.id)
+        #             else:
+        #                 self.process_send_nudes(message.chat.id)
 
-            except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error (text)\n{error}",
-                )
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
+        #     except Exception as error:
+        #         bot.send_message(
+        #             lc.config["chat_id"],
+        #             f"Hi Devs!!\nHandle This Error (text)\n{error}",
+        #         )
+        #         bot.reply_to(message, f"An error occurred!\nError: {error}")
 
         @bot.message_handler(commands=["version"])
         def version(message):
