@@ -11,7 +11,11 @@
             "module": "leistungsbot",
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
-            "justMyCode": true
+            "justMyCode": true,
+            "args": [
+                "--config",
+                "${workspaceFolder}/BotConfig.yml"
+            ]
         },
         {
             "name": "Python: Aktuelle Datei",
