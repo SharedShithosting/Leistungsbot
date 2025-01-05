@@ -66,4 +66,4 @@ def start_bot(token: str) -> None:
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
-    create_bot(lc.config["bot_token"])
+    start_bot(lc.config["bot_token"])
