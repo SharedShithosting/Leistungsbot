@@ -1092,8 +1092,8 @@ class LeistungsBot:
         if open_hours_correct:
             self.poller.dry_send()
 
-    def process_send_nudes(self, message):
-        self.helper.send_nude(message)
+    def process_send_nudes(self, chat_id):
+        self.helper.send_nude(chat_id)
 
     def process_search_location(self, chat_id, query):
         finds, rand_id = self.helper.search_location(query)
