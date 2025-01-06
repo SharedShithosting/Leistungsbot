@@ -184,7 +184,10 @@ class Helper:
         for i in range(len(g_places)):
             markup.add(
                 InlineKeyboardButton(
-                    g_places[i]["name"],
+                    f"""{g_places[i]['name']} - {
+                        g_places[i]
+                        ['formatted_address']
+                    }""",
                     callback_data=json.dumps({"🍻search": (rand_id, i)}),
                 ),
             )
