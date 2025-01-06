@@ -14,7 +14,8 @@ import time
 from datetime import date
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, TypedDict
+from typing import Optional
+from typing import TypedDict
 
 import telebot
 from telebot import custom_filters
@@ -91,7 +92,7 @@ class LeistungsState(StatesGroup):
     switcherooAlternateLocation = State()
 
 class UserContext(TypedDict):
-    leistungstag: Optional[dict]
+    leistungstag: dict | None
 
 class LeistungsBot:
     def __init__(self) -> None:
@@ -1058,7 +1059,7 @@ class LeistungsBot:
             print(f'Location {lt["location"]}')
 
             if not message.from_user.id in self.user_context:
-                self.user_context[message.from_user.id] = { "leistungstag": lt }
+                self.user_context[message.from_user.id] = { "leistungstag": lt}
             else:
                 self.user_context[message.from_user.id]["leistungstag"] = lt
 
@@ -1067,9 +1068,11 @@ class LeistungsBot:
 
         @bot.message_handler(state=LeistungsState.switcherooAlternateLocation)
         def switcheroo_alternate_location(message: telebot.types.Message) -> None:
-            if (not message.from_user.id in self.user_context or
+            if (
+                not message.from_user.id in self.user_context or
                 not "leistungstag" in self.user_context[message.from_user.id] or
-                self.user_context[message.from_user.id]["leistungstag"] is None):
+                self.user_context[message.from_user.id]["leistungstag"] is None
+            ):
                 self.bot.send_message(message.chat.id, "Could not find Leistungstag in UserContext. This should not happen, please try again ...")
                 self.bot.delete_state()
                 return
