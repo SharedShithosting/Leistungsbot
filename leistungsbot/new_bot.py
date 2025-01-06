@@ -22,7 +22,8 @@ import leistungsbot.Commands
 from leistungsbot.Conversation import ConversationState
 from leistungsbot.LeistungbotContext import LeistungsbotContext, BotContext
 
-import leistungsbot.handler
+import leistungsbot.handlers.history
+import leistungsbot.handlers.polls
 
 async def init_bot(application: Application) -> None:
     await application.bot.set_my_commands(Commands.as_list())
@@ -48,16 +49,16 @@ def start_bot(token: str) -> None:
 
     conv_handler = ConversationHandler(
         entry_points=[
-            CommandHandler(Commands.LEISTUNGSPOLL.command, leistungsbot.handler.leistungspoll),
-            CommandHandler(Commands.ZUSATZPOLL.command, leistungsbot.handler.leistungspoll),
-            CommandHandler(Commands.KONKURRENZPOLL.command, leistungsbot.handler.leistungspoll),
+            CommandHandler(Commands.LEISTUNGSPOLL.command, leistungsbot.handlers.polls.leistungspoll),
+            CommandHandler(Commands.ZUSATZPOLL.command, leistungsbot.handlers.polls.leistungspoll),
+            CommandHandler(Commands.KONKURRENZPOLL.command, leistungsbot.handlers.polls.leistungspoll),
             CommandHandler(Commands.HELP.command, help),
             CommandHandler(Commands.SENDNUDES.command, send_nudes),
-            CommandHandler(Commands.HISTORY.command, leistungsbot.handler.history_send_kind),
+            CommandHandler(Commands.HISTORY.command, leistungsbot.handlers.history.history_send_kind),
         ],
         states={
-            ConversationState.HISTORY_SELECT_KIND: [CallbackQueryHandler(leistungsbot.handler.history_send_leistungstag)],
-            ConversationState.LEISTUNGSPOLL_SELECT_LOCATION: [MessageHandler(None, leistungsbot.handler.leistungspoll_location)],
+            ConversationState.HISTORY_SELECT_KIND: [CallbackQueryHandler(leistungsbot.handlers.history.history_send_leistungstag)],
+            ConversationState.LEISTUNGSPOLL_SELECT_LOCATION: [MessageHandler(None, leistungsbot.handlers.polls.leistungspoll_location)],
             ConversationHandler.TIMEOUT: [MessageHandler(None, timeout), CallbackQueryHandler(timeout)]
         },
         fallbacks=[CommandHandler("cancel", cancel)],
