@@ -14,7 +14,6 @@ import time
 from datetime import date
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 from typing import TypedDict
 
 import telebot
@@ -91,8 +90,10 @@ class LeistungsState(StatesGroup):
     switcherooLeistungstagNumber = State()
     switcherooAlternateLocation = State()
 
+
 class UserContext(TypedDict):
     leistungstag: dict | None
+
 
 class LeistungsBot:
     def __init__(self) -> None:
@@ -1045,35 +1046,58 @@ class LeistungsBot:
                 )
 
         @bot.message_handler(state=LeistungsState.switcherooLeistungstagNumber)
-        def switcheroo_leistungstag_number(message: telebot.types.Message) -> None:
+        def switcheroo_leistungstag_number(
+            message: telebot.types.Message,
+        ) -> None:
             try:
                 lt_number = int(message.text)
-            except:
-                self.bot.send_message(message.chat.id, "Host du in da Voikschui ned aufpasst wos a nummer is? Probiers numoi ...")
+            except BaseException:
+                self.bot.send_message(
+                    message.chat.id,
+                    "Host du in da Voikschui ned aufpasst wos a nummer is? Probiers numoi ...",
+                )
 
             lt = self.helper.db.getLeistungstagByNumber(lt_number)
             if lt is None:
-                self.bot.send_message(message.chat.id, "Den Leistungstog find i ned. Schau numoi genau")
+                self.bot.send_message(
+                    message.chat.id,
+                    "Den Leistungstog find i ned. Schau numoi genau",
+                )
                 return
 
             print(f'Location {lt["location"]}')
 
-            if not message.from_user.id in self.user_context:
-                self.user_context[message.from_user.id] = { "leistungstag": lt}
+            if message.from_user.id not in self.user_context:
+                self.user_context[message.from_user.id] = {"leistungstag": lt}
             else:
                 self.user_context[message.from_user.id]["leistungstag"] = lt
 
-            self.bot.send_message(message.chat.id, "Passt. Wo schau ma stottdessen hin?", reply_markup=self.helper.location_keyboard())
-            self.bot.set_state(message.from_user.id, LeistungsState.switcherooAlternateLocation, message.chat.id)
+            self.bot.send_message(
+                message.chat.id,
+                "Passt. Wo schau ma stottdessen hin?",
+                reply_markup=self.helper.location_keyboard(),
+            )
+            self.bot.set_state(
+                message.from_user.id,
+                LeistungsState.switcherooAlternateLocation,
+                message.chat.id,
+            )
 
         @bot.message_handler(state=LeistungsState.switcherooAlternateLocation)
-        def switcheroo_alternate_location(message: telebot.types.Message) -> None:
+        def switcheroo_alternate_location(
+            message: telebot.types.Message,
+        ) -> None:
             if (
-                not message.from_user.id in self.user_context or
-                not "leistungstag" in self.user_context[message.from_user.id] or
-                self.user_context[message.from_user.id]["leistungstag"] is None
+                message.from_user.id not in self.user_context
+                or "leistungstag"
+                not in self.user_context[message.from_user.id]
+                or self.user_context[message.from_user.id]["leistungstag"]
+                is None
             ):
-                self.bot.send_message(message.chat.id, "Could not find Leistungstag in UserContext. This should not happen, please try again ...")
+                self.bot.send_message(
+                    message.chat.id,
+                    "Could not find Leistungstag in UserContext. This should not happen, please try again ...",
+                )
                 self.bot.delete_state(message.from_user.id, message.chat.id)
                 return
 
@@ -1095,9 +1119,16 @@ class LeistungsBot:
 
             else:
                 lt = self.user_context[message.from_user.id]["leistungstag"]
-                self.helper.db.switchLeistungstagLocation(lt["key"], lt["location"], info["key"])
+                self.helper.db.switchLeistungstagLocation(
+                    lt["key"],
+                    lt["location"],
+                    info["key"],
+                )
 
-                self.bot.send_message(message.from_user.id, f"Ok, donn gemma am {lt["date"].strftime("%d.%m.%Y")} ins {info["name"]}")
+                self.bot.send_message(
+                    message.from_user.id,
+                    f"Ok, donn gemma am {lt['date'].strftime('%d.%m.%Y')} ins {info['name']}",
+                )
                 self.bot.delete_state(message.from_user.id, message.chat.id)
 
             self.user_context[message.from_user.id]["leistungstag"] = None
@@ -1111,7 +1142,10 @@ class LeistungsBot:
                     "Diese Funktion ist nicht für den Pöbel gedacht.",
                 )
 
-            self.bot.send_message(message.chat.id, "Wechan muastn ändern? Schick ma de nummer und i schau wos i doan konn.")
+            self.bot.send_message(
+                message.chat.id,
+                "Wechan muastn ändern? Schick ma de nummer und i schau wos i doan konn.",
+            )
             self.bot.set_state(
                 message.from_user.id,
                 LeistungsState.switcherooLeistungstagNumber,
