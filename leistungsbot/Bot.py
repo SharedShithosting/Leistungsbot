@@ -778,7 +778,7 @@ class LeistungsBot:
                 if message.chat.type != "private":
                     self.helper.bot.reply_to(
                         message,
-                        "Und wenn ma des ned im Gruppenchat machen, du Nervensäge?",
+                        "Und wenn ma des ned im Gruppenchat machen, du Bauernschädl?",
                     )
                 else:
                     leistungstag = self.helper.db.getLeistungsTags(
