@@ -1074,7 +1074,7 @@ class LeistungsBot:
                 self.user_context[message.from_user.id]["leistungstag"] is None
             ):
                 self.bot.send_message(message.chat.id, "Could not find Leistungstag in UserContext. This should not happen, please try again ...")
-                self.bot.delete_state()
+                self.bot.delete_state(message.from_user.id, message.chat.id)
                 return
 
             location = message.text.strip()
@@ -1098,7 +1098,7 @@ class LeistungsBot:
                 self.helper.db.switchLeistungstagLocation(lt["key"], lt["location"], info["key"])
 
                 self.bot.send_message(message.from_user.id, f"Ok, donn gemma am {lt["date"].strftime("%d.%m.%Y")} ins {info["name"]}")
-                self.bot.delete_state()
+                self.bot.delete_state(message.from_user.id, message.chat.id)
 
             self.user_context[message.from_user.id]["leistungstag"] = None
             # TODO: Edit poll message, if possible
