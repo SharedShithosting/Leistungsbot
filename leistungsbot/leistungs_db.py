@@ -677,7 +677,7 @@ class LeistungsDB:
         cursor.execute(sql)
         return self.convert(cursor.fetchone(), True)
 
-    def getLeistungstagByNumber(self, number: int) -> Optional[dict]:
+    def getLeistungstagByNumber(self, number: int) -> dict | None:
         if not self.mydb.is_connected():
             if not self.connect():
                 logging.error("No connection to DataBase possible")
@@ -688,21 +688,28 @@ class LeistungsDB:
         cursor.execute(sql, (number,))
         return self.convert(cursor.fetchone(), True)
 
-    def switchLeistungstagLocation(self, lt_id: int, old_location_id: int, new_location_id: int) -> None:
+    def switchLeistungstagLocation(
+        self, lt_id: int, old_location_id: int, new_location_id: int
+    ) -> None:
         if not self.mydb.is_connected():
             if not self.connect():
                 logging.error("No connection to DataBase possible")
                 raise Exception("No connection to DataBase available")
 
         cursor = self.mydb.cursor()
-        update_lt_sql = "UPDATE `leistungstag` SET `location` = '%s' WHERE `key` = '%s'"
+        update_lt_sql = (
+            "UPDATE `leistungstag` SET `location` = '%s' WHERE `key` = '%s'"
+        )
         update_old_location = "UPDATE `locations` as l SET `visited` = (SELECT count(*) FROM leistungstag WHERE location = l.`key` LIMIT 1) WHERE `key` = '%s'"
-        update_new_location = "UPDATE `locations` as l SET `visited` = 1 WHERE `key` = '%s'"
+        update_new_location = (
+            "UPDATE `locations` as l SET `visited` = 1 WHERE `key` = '%s'"
+        )
 
         cursor.execute(update_lt_sql, (new_location_id, lt_id))
         cursor.execute(update_old_location, (old_location_id,))
         cursor.execute(update_new_location, (new_location_id,))
         self.mydb.commit()
+
 
 if __name__ == "__main__":
     logging.basicConfig(filename="myapp.log", level=logging.DEBUG)
