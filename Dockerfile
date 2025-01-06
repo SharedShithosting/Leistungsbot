@@ -26,6 +26,7 @@ COPY pyproject.toml poetry.lock  ./
 
 # Install the dependencies and clear the cache afterwards.
 #   This may save some MBs.
+RUN poetry dynamic-versioning
 RUN poetry install --no-root --without=dev && rm -rf $POETRY_CACHE_DIR
 
 # Now let's build the runtime image from the builder.

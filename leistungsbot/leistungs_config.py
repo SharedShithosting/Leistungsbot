@@ -15,10 +15,10 @@ template = {
     "google": str,
     "bot_token": str,
     "api_hash": str,
-    "api_id": int,
-    "chat_id": int,
-    "leistungschat_id": int,
-    "leistungsadmin_id": int,
+    "api_id": [int, str],
+    "chat_id": [int, str],
+    "leistungschat_id": [int, str],
+    "leistungsadmin_id": [int, str],
     "usernames": confuse.StrSeq(),
 }
 
@@ -31,7 +31,14 @@ if os.environ.get("LEISTUNGSBOT_CONFIG_FILE"):
         base_for_paths=True,
     )
 __config.set_env()
-config = __config.get(template)  # NOQA
+try:
+    config = __config.get(template)  # NOQA
+except Exception:
+    print(
+        "Configuration error: "
+        "Please make sure to set the environment variables or provide a configuration file.",
+    )
+    config = None
 
 
 def set_args(namespace: argparse.Namespace, dots: bool = False):
@@ -41,6 +48,7 @@ def set_args(namespace: argparse.Namespace, dots: bool = False):
             base_for_paths=True,
         )
     __config.set_args(namespace, dots)
+    global config
     config = __config.get(template)  # NOQA
 
 

@@ -87,7 +87,7 @@ class Places:
         res = self.gmaps.find_place(
             query,
             input_type="textquery",
-            fields=["name", "place_id"],
+            fields=["name", "place_id", "formatted_address"],
             location_bias=f"circle:{self.radius}@{self.lat},{self.lng}",
             language=self.language,
         )

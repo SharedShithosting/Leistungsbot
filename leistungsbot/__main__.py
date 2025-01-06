@@ -6,8 +6,6 @@
 # #############################################################################
 from __future__ import annotations
 
-from leistungsbot import Bot
+from leistungsbot.Bot import main as Bot
 
-print("Starting LeistungsBot")
-lb = Bot.LeistungsBot()
-lb.infinite_poll()
+Bot()

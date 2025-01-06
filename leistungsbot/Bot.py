@@ -13,8 +13,8 @@ import logging
 import time
 from datetime import date
 from datetime import datetime
-from datetime import timedelta
 from pathlib import Path
+from typing import TypedDict
 
 import telebot
 from telebot import custom_filters
@@ -30,6 +30,8 @@ from leistungsbot.BotHelper import LeistungsTyp
 from leistungsbot.BotHelper import PersistantLeistungsTagPoller
 from leistungsbot.BotScheduler import Scheduler
 from leistungsbot.google_place import Openness
+from leistungsbot.leistungs_returns import LeistungsReturnCodes
+from leistungsbot.package import _version
 
 # States storage
 # Now, you can pass storage to bot.
@@ -55,6 +57,7 @@ User Available Commands:
     13. /location_info
     14. /zusatzpoll
     15. /konkurrenzpoll
+    16. /version
 
 Developer Commands: #NOTE: ONLY @eckphi is
  allowed for these comands:
@@ -80,9 +83,16 @@ class LeistungsState(StatesGroup):
     historyLeistungstag = State()
     remindePoll = State()
     closePoll = State()
+    sneakyClosePoll = State()
     removeLocation = State()
     rateLocation = State()
     genericLeistungsmessage = State()
+    switcherooLeistungstagNumber = State()
+    switcherooAlternateLocation = State()
+
+
+class UserContext(TypedDict):
+    leistungstag: dict | None
 
 
 class LeistungsBot:
@@ -93,6 +103,7 @@ class LeistungsBot:
         self.scheduler = Scheduler(self.bot)
         self.poller = None
         self.last_text_nudes = datetime.min
+        self.user_context: dict[int, UserContext] = {}
 
         @bot.callback_query_handler(func=DetailedTelegramCalendar.func())
         def cal(call):
@@ -165,7 +176,12 @@ class LeistungsBot:
                                 ),
                             )
                     else:
-                        self.helper.add_location(val[0], val[1])
+                        res = self.helper.add_location(val[0], val[1])
+                        if res == LeistungsReturnCodes.DB_DUPLICATE:
+                            self.bot.send_message(
+                                call.message.chat.id,
+                                "Des isch scho drin, du deppata!",
+                            )
                 elif cmd == "cancle":
                     self.process_cancle(call.message)
                 elif cmd == "publish":
@@ -232,6 +248,14 @@ class LeistungsBot:
                         == LeistungsState.closePoll.name
                     ):
                         self.process_closepoll(call.message, val)
+                    elif (
+                        self.bot.get_state(
+                            call.from_user.id,
+                            call.message.chat.id,
+                        )
+                        == LeistungsState.sneakyClosePoll.name
+                    ):
+                        self.process_closepoll(call.message, val, True)
                     elif (
                         self.bot.get_state(
                             call.from_user.id,
@@ -432,7 +456,7 @@ class LeistungsBot:
         def alive(message):
             bot.reply_to(
                 message,
-                f"Hey {message.from_user.username}, Ready To Serve You",
+                f"Hey {message.from_user.username}, Ready To Serve You in version {_version.__version__}",
             )
 
         @bot.message_handler(commands=["start"])
@@ -635,6 +659,37 @@ class LeistungsBot:
                     f"An error occurred!\nError: {error}",
                 )
 
+        @bot.message_handler(commands=["sneaky_closepoll"])
+        def sneaky_close_poll(message: telebot.types.Message) -> None:
+            try:
+                if not self.helper.sender_has_permission(message):
+                    self.bot.reply_to(
+                        message,
+                        "Diese Funktion ist nicht für den Pöbel gedacht.",
+                    )
+                    return
+
+                self.bot.set_state(
+                    message.from_user.id,
+                    LeistungsState.sneakyClosePoll,
+                    message.chat.id,
+                )
+                self.bot.reply_to(
+                    message,
+                    "Welchen Poll wüst sneaky closen?",
+                    reply_markup=self.helper.open_polls_button(),
+                )
+            except Exception as error:
+                bot.send_message(
+                    lc.config["chat_id"],
+                    f"Hi Devs!!\nHandle This Error plox\n{error}",
+                )
+                bot.reply_to(message, f"An error occurred!\nError: {error}")
+                bot.send_message(
+                    lc.config["chat_id"],
+                    f"An error occurred!\nError: {error}",
+                )
+
         @bot.message_handler(commands=["sendnudes"])
         def send_nudes(message):
             try:
@@ -733,7 +788,7 @@ class LeistungsBot:
                 if message.chat.type != "private":
                     self.helper.bot.reply_to(
                         message,
-                        "Und wenn ma des ned im Gruppenchat machen, du Nervensäge?",
+                        "Und wenn ma des ned im Gruppenchat machen, du Bauernschädl?",
                     )
                 else:
                     leistungstag = self.helper.db.getLeistungsTags(
@@ -992,25 +1047,139 @@ class LeistungsBot:
                     f"An error occurred!\nError: {error}",
                 )
 
-        @bot.message_handler(content_types=["text"])
-        def new_msg(message):
+        @bot.message_handler(state=LeistungsState.switcherooLeistungstagNumber)
+        def switcheroo_leistungstag_number(
+            message: telebot.types.Message,
+        ) -> None:
             try:
-                if "nude" in message.text:
-                    if message.chat.type != "private":
-                        if (datetime.now() - self.last_text_nudes) > timedelta(
-                            days=1,
-                        ):
-                            self.last_text_nudes = datetime.now()
-                            self.process_send_nudes(message.chat.id)
-                    else:
-                        self.process_send_nudes(message.chat.id)
-
-            except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error (text)\n{error}",
+                lt_number = int(message.text)
+            except BaseException:
+                self.bot.send_message(
+                    message.chat.id,
+                    "Host du in da Voikschui ned aufpasst wos a nummer is? Probiers numoi ...",
                 )
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
+
+            lt = self.helper.db.getLeistungstagByNumber(lt_number)
+            if lt is None:
+                self.bot.send_message(
+                    message.chat.id,
+                    "Den Leistungstog find i ned. Schau numoi genau",
+                )
+                return
+
+            print(f'Location {lt["location"]}')
+
+            if message.from_user.id not in self.user_context:
+                self.user_context[message.from_user.id] = {"leistungstag": lt}
+            else:
+                self.user_context[message.from_user.id]["leistungstag"] = lt
+
+            self.bot.send_message(
+                message.chat.id,
+                "Passt. Wo schau ma stottdessen hin?",
+                reply_markup=self.helper.location_keyboard(),
+            )
+            self.bot.set_state(
+                message.from_user.id,
+                LeistungsState.switcherooAlternateLocation,
+                message.chat.id,
+            )
+
+        @bot.message_handler(state=LeistungsState.switcherooAlternateLocation)
+        def switcheroo_alternate_location(
+            message: telebot.types.Message,
+        ) -> None:
+            if (
+                message.from_user.id not in self.user_context
+                or "leistungstag"
+                not in self.user_context[message.from_user.id]
+                or self.user_context[message.from_user.id]["leistungstag"]
+                is None
+            ):
+                self.bot.send_message(
+                    message.chat.id,
+                    "Could not find Leistungstag in UserContext. This should not happen, please try again ...",
+                )
+                self.bot.delete_state(message.from_user.id, message.chat.id)
+                return
+
+            location = message.text.strip()
+            # check if location exists in database
+            info = self.helper.db.getLocationInfo(location)
+
+            if not info:
+                self.bot.send_message(
+                    message.chat.id,
+                    f"'{location}' kenn i ned..wüstas stattdessn zur listn dazua gebn?",
+                    reply_markup=self.helper.unkown_location_button(location),
+                )
+                self.bot.set_state(
+                    message.from_user.id,
+                    LeistungsState.searchLocation,
+                    message.chat.id,
+                )
+
+            else:
+                lt = self.user_context[message.from_user.id]["leistungstag"]
+                self.helper.db.switchLeistungstagLocation(
+                    lt["key"],
+                    lt["location"],
+                    info["key"],
+                )
+
+                self.bot.send_message(
+                    message.from_user.id,
+                    f"Ok, donn gemma am {lt['date'].strftime('%d.%m.%Y')} ins {info['name']}",
+                )
+                self.bot.delete_state(message.from_user.id, message.chat.id)
+
+            self.user_context[message.from_user.id]["leistungstag"] = None
+            # TODO: Edit poll message, if possible
+
+        @bot.message_handler(commands="switcheroo")
+        def switcheroo(message: telebot.types.Message) -> None:
+            if not self.helper.sender_has_permission(message):
+                self.bot.reply_to(
+                    message,
+                    "Diese Funktion ist nicht für den Pöbel gedacht.",
+                )
+
+            self.bot.send_message(
+                message.chat.id,
+                "Wechan muastn ändern? Schick ma de nummer und i schau wos i doan konn.",
+            )
+            self.bot.set_state(
+                message.from_user.id,
+                LeistungsState.switcherooLeistungstagNumber,
+                message.chat.id,
+            )
+
+        # @bot.message_handler(content_types=["text"])
+        # def new_msg(message):
+        #     try:
+        #         if "nude" in message.text:
+        #             if message.chat.type != "private":
+        #                 if (datetime.now() - self.last_text_nudes) > timedelta(
+        #                     days=1,
+        #                 ):
+        #                     self.last_text_nudes = datetime.now()
+        #                     self.process_send_nudes(message.chat.id)
+        #             else:
+        #                 self.process_send_nudes(message.chat.id)
+
+        #     except Exception as error:
+        #         bot.send_message(
+        #             lc.config["chat_id"],
+        #             f"Hi Devs!!\nHandle This Error (text)\n{error}",
+        #         )
+        #         bot.reply_to(message, f"An error occurred!\nError: {error}")
+
+        @bot.message_handler(commands=["version"])
+        def version(message):
+            bot.reply_to(
+                message,
+                f"LeistungsBot - {_version.__version__}",
+            )
 
     def process_cancle(self, message):
         self.bot.send_message(
@@ -1062,40 +1231,70 @@ class LeistungsBot:
         )
         self.bot.send_message(message.chat.id, "Da Reminder is draußen!")
 
-    def process_closepoll(self, message, leistungstag_key):
-        if not self.helper.sender_has_permission(message):
-            self.bot.reply_to(
-                message,
-                "Diese Funktion ist nicht für den Pöbel gedacht.",
-            )
-            return
+    def process_closepoll(
+        self,
+        message: telebot.types.Message,
+        leistungstag_key: int,
+        sneaky: bool = False,
+    ) -> None:
+        # Check does not work when in callback
+        # if not self.helper.sender_has_permission(message):
+        #     self.bot.reply_to(
+        #         message,
+        #         "Diese Funktion ist nicht für den Pöbel gedacht.",
+        #     )
+        #     return
 
         leistungstag = self.helper.db.getLeistungstag(leistungstag_key)
         self.helper.db.closeLeistungstag(leistungstag_key)
-        self.bot.stop_poll(
-            lc.config["leistungschat_id"],
-            leistungstag["poll_id"],
-        )
-        self.bot.unpin_chat_message(
-            lc.config["leistungschat_id"],
-            leistungstag["poll_id"],
-        )
-        self.bot.send_message(
-            lc.config["leistungschat_id"],
-            "Schluss, aus, vorbei die Wahl is glaufen und für de de abgstimmt haben is a Platzerl reserviert.",
-            reply_to_message_id=leistungstag["poll_id"],
-        )
-        self.bot.send_message(
-            message.chat.id,
-            "De Poll is zua. I hoff für dich d Reservierung is scho erledigt!",
-        )
+        try:
+            self.bot.stop_poll(
+                lc.config["leistungschat_id"],
+                leistungstag["poll_id"],
+            )
+        except BaseException:
+            pass
+        try:
+            self.bot.unpin_chat_message(
+                lc.config["leistungschat_id"],
+                leistungstag["poll_id"],
+            )
+        except BaseException:
+            pass
+        if not sneaky:
+            self.bot.send_message(
+                lc.config["leistungschat_id"],
+                "Schluss, aus, vorbei die Wahl is glaufen und für de de abgstimmt haben is a Platzerl reserviert.",
+                reply_to_message_id=leistungstag["poll_id"],
+            )
+            self.bot.send_message(
+                message.chat.id,
+                "De Poll is zua. I hoff für dich d Reservierung is scho erledigt!",
+            )
+        else:
+            try:
+                sneakiely = (
+                    importlib.resources.as_file(
+                        importlib.resources.files("resources") / "sneaky.gif",
+                    ),
+                )
+            except BaseException:
+                resources = Path(__file__).parent / "resources"
+                sneakiely = resources / "sneaky.gif"
+            self.bot.send_animation(
+                message.chat.id,
+                animation=telebot.types.InputFile(
+                    sneakiely,
+                ),
+                caption="De Poll is zua. I hoff für dich d Reservierung is scho erledigt!",
+            )
 
     def process_check_open_hours(self, callback, open_hours_correct):
         if open_hours_correct:
             self.poller.dry_send()
 
-    def process_send_nudes(self, message):
-        self.helper.send_nude(message)
+    def process_send_nudes(self, chat_id):
+        self.helper.send_nude(chat_id)
 
     def process_search_location(self, chat_id, query):
         finds, rand_id = self.helper.search_location(query)
@@ -1320,25 +1519,21 @@ def main():
         "--host",
         dest="mysql.host",
         help="host name/ip from the mysql server",
-        default="127.0.0.1",
     )
     parser.add_argument(
         "--db",
         dest="mysql.db",
         help="databse name",
-        default="leistungs_db",
     )
     parser.add_argument(
         "--user",
         dest="mysql.user",
         help="user with access to the databse",
-        default="leistungs_user",
     )
     parser.add_argument(
         "--password",
         dest="mysql.password",
         help="user password",
-        default="RealyStrongPassword",
     )
     parser.add_argument("--config", "-c", help="Provide a custom config file")
 

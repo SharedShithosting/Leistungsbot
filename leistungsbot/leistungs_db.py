@@ -16,6 +16,7 @@ import mysql.connector
 
 from leistungsbot import leistungs_config as lc
 from leistungsbot.google_place import Places
+from leistungsbot.leistungs_returns import LeistungsReturnCodes
 
 
 class LeistungsTagState(Enum):
@@ -172,7 +173,7 @@ class LeistungsDB:
         cursor.execute(sql, values)
         self.mydb.commit()
 
-    def addLocation(self, place_id: str, name: str):
+    def addLocation(self, place_id: str, name: str) -> LeistungsReturnCodes:
         if not self.mydb.is_connected():
             if not self.connect():
                 logging.error("No connection to DataBase possible")
@@ -183,6 +184,7 @@ class LeistungsDB:
         retry = True
         orig_name = name
         cnt = 1
+        res = LeistungsReturnCodes.OK
         while retry:
             try:
                 sql = "INSERT INTO `locations` (`name`, `google-place-id`, `lat`, `lng`, `address`, `phone`, `url`) VALUES (%s, %s, %s, %s, %s, %s, %s);"
@@ -206,9 +208,15 @@ class LeistungsDB:
                 cursor.execute(sql, values)
                 retry = False
             except mysql.connector.IntegrityError:
-                cnt += 1
-                name = orig_name + str(cnt)
+                location = self.getLocationInfo(name)
+                if location.get("google-place-id") == place_id:
+                    retry = False
+                    res = LeistungsReturnCodes.DB_DUPLICATE
+                else:
+                    cnt += 1
+                    name = orig_name + str(cnt)
         self.mydb.commit()
+        return res
 
     def removeLocation(self, key):
         if not self.mydb.is_connected():
@@ -655,6 +663,53 @@ class LeistungsDB:
         values = (user_key, leistungstag_key)
         logging.debug(sql % values)
         cursor.execute(sql, values)
+        self.mydb.commit()
+
+    def getMostRecentLeistungstag(self) -> dict:
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
+        cursor = self.mydb.cursor(dictionary=True)
+        sql = "SELECT * FROM `leistungstag` ORDER BY `date` DESC LIMIT 1"
+        cursor.execute(sql)
+        return self.convert(cursor.fetchone(), True)
+
+    def getLeistungstagByNumber(self, number: int) -> dict | None:
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
+        cursor = self.mydb.cursor(dictionary=True)
+        sql = "SELECT * FROM `leistungs_view` WHERE number = %s"
+        cursor.execute(sql, (number,))
+        return self.convert(cursor.fetchone(), True)
+
+    def switchLeistungstagLocation(
+        self,
+        lt_id: int,
+        old_location_id: int,
+        new_location_id: int,
+    ) -> None:
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
+        cursor = self.mydb.cursor()
+        update_lt_sql = (
+            "UPDATE `leistungstag` SET `location` = '%s' WHERE `key` = '%s'"
+        )
+        update_old_location = "UPDATE `locations` as l SET `visited` = (SELECT count(*) FROM leistungstag WHERE location = l.`key` LIMIT 1) WHERE `key` = '%s'"
+        update_new_location = (
+            "UPDATE `locations` as l SET `visited` = 1 WHERE `key` = '%s'"
+        )
+
+        cursor.execute(update_lt_sql, (new_location_id, lt_id))
+        cursor.execute(update_old_location, (old_location_id,))
+        cursor.execute(update_new_location, (new_location_id,))
         self.mydb.commit()
 
 

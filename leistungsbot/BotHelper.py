@@ -28,6 +28,7 @@ from telegram_bot_calendar import LSTEP
 from leistungsbot import leistungs_config as lc
 from leistungsbot.google_place import Places
 from leistungsbot.leistungs_db import LeistungsDB
+from leistungsbot.leistungs_returns import LeistungsReturnCodes
 
 
 class LeistungsTyp(IntEnum):
@@ -183,7 +184,10 @@ class Helper:
         for i in range(len(g_places)):
             markup.add(
                 InlineKeyboardButton(
-                    g_places[i]["name"],
+                    f"""{g_places[i]['name']} - {
+                        g_places[i]
+                        ['formatted_address']
+                    }""",
                     callback_data=json.dumps({"🍻search": (rand_id, i)}),
                 ),
             )
@@ -321,6 +325,7 @@ class Helper:
             chat_id,
             gif,
             caption="brought to you by Maxmaier",
+            has_spoiler=True,
         )
 
     def next_leistungstag(self):
@@ -404,9 +409,12 @@ class Helper:
             self.approve_location_button(rand_id, index),
         )
 
-    def add_location(self, rand_id, index):
+    def add_location(self, rand_id, index) -> LeistungsReturnCodes:
         data = self.load_from_rand_file(rand_id)
-        self.db.addLocation(data[index]["place_id"], data[index]["name"])
+        return self.db.addLocation(
+            data[index]["place_id"],
+            data[index]["name"],
+        )
 
     def remove_location(self, locationname):
         key = self.db.getLocationKey(locationname)
