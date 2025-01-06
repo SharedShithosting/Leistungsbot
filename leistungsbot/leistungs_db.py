@@ -16,6 +16,7 @@ import mysql.connector
 
 from leistungsbot import leistungs_config as lc
 from leistungsbot.google_place import Places
+from leistungsbot.leistungs_returns import LeistungsReturnCodes
 
 
 class LeistungsTagState(Enum):
@@ -37,6 +38,7 @@ class LeistungsDB:
                 user=lc.config["mysql"]["user"],
                 password=lc.config["mysql"]["password"],
                 ssl_disabled=True,
+                collation="utf8mb4_general_ci",
             )
             return True
         except Exception as e:
@@ -171,7 +173,7 @@ class LeistungsDB:
         cursor.execute(sql, values)
         self.mydb.commit()
 
-    def addLocation(self, place_id: str, name: str):
+    def addLocation(self, place_id: str, name: str) -> LeistungsReturnCodes:
         if not self.mydb.is_connected():
             if not self.connect():
                 logging.error("No connection to DataBase possible")
@@ -182,6 +184,7 @@ class LeistungsDB:
         retry = True
         orig_name = name
         cnt = 1
+        res = LeistungsReturnCodes.OK
         while retry:
             try:
                 sql = "INSERT INTO `locations` (`name`, `google-place-id`, `lat`, `lng`, `address`, `phone`, `url`) VALUES (%s, %s, %s, %s, %s, %s, %s);"
@@ -205,9 +208,15 @@ class LeistungsDB:
                 cursor.execute(sql, values)
                 retry = False
             except mysql.connector.IntegrityError:
-                cnt += 1
-                name = orig_name + str(cnt)
+                location = self.getLocationInfo(name)
+                if location.get("google-place-id") == place_id:
+                    retry = False
+                    res = LeistungsReturnCodes.DB_DUPLICATE
+                else:
+                    cnt += 1
+                    name = orig_name + str(cnt)
         self.mydb.commit()
+        return res
 
     def removeLocation(self, key):
         if not self.mydb.is_connected():

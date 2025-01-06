@@ -29,6 +29,7 @@ from leistungsbot.BotHelper import LeistungsTyp
 from leistungsbot.BotHelper import PersistantLeistungsTagPoller
 from leistungsbot.BotScheduler import Scheduler
 from leistungsbot.google_place import Openness
+from leistungsbot.leistungs_returns import LeistungsReturnCodes
 from leistungsbot.package import _version
 
 # States storage
@@ -166,7 +167,12 @@ class LeistungsBot:
                                 ),
                             )
                     else:
-                        self.helper.add_location(val[0], val[1])
+                        res = self.helper.add_location(val[0], val[1])
+                        if res == LeistungsReturnCodes.DB_DUPLICATE:
+                            self.bot.send_message(
+                                call.message.chat.id,
+                                "Des isch scho drin, du deppata!",
+                            )
                 elif cmd == "cancle":
                     self.process_cancle(call.message)
                 elif cmd == "publish":
@@ -1326,25 +1332,21 @@ def main():
         "--host",
         dest="mysql.host",
         help="host name/ip from the mysql server",
-        default="127.0.0.1",
     )
     parser.add_argument(
         "--db",
         dest="mysql.db",
         help="databse name",
-        default="leistungs_db",
     )
     parser.add_argument(
         "--user",
         dest="mysql.user",
         help="user with access to the databse",
-        default="leistungs_user",
     )
     parser.add_argument(
         "--password",
         dest="mysql.password",
         help="user password",
-        default="RealyStrongPassword",
     )
     parser.add_argument("--config", "-c", help="Provide a custom config file")
 
