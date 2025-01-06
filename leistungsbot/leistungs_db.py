@@ -11,7 +11,6 @@ import re
 from datetime import date
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 import mysql.connector
 
@@ -689,7 +688,10 @@ class LeistungsDB:
         return self.convert(cursor.fetchone(), True)
 
     def switchLeistungstagLocation(
-        self, lt_id: int, old_location_id: int, new_location_id: int
+        self,
+        lt_id: int,
+        old_location_id: int,
+        new_location_id: int,
     ) -> None:
         if not self.mydb.is_connected():
             if not self.connect():
