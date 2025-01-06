@@ -14,6 +14,7 @@ import time
 from datetime import date
 from datetime import datetime
 from pathlib import Path
+from typing import Optional, TypedDict
 
 import telebot
 from telebot import custom_filters
@@ -89,6 +90,8 @@ class LeistungsState(StatesGroup):
     switcherooLeistungstagNumber = State()
     switcherooAlternateLocation = State()
 
+class UserContext(TypedDict):
+    leistungstag: Optional[dict]
 
 class LeistungsBot:
     def __init__(self) -> None:
@@ -98,6 +101,7 @@ class LeistungsBot:
         self.scheduler = Scheduler(self.bot)
         self.poller = None
         self.last_text_nudes = datetime.min
+        self.user_context: dict[int, UserContext] = {}
 
         @bot.callback_query_handler(func=DetailedTelegramCalendar.func())
         def cal(call):
@@ -1041,22 +1045,60 @@ class LeistungsBot:
 
         @bot.message_handler(state=LeistungsState.switcherooLeistungstagNumber)
         def switcheroo_leistungstag_number(message: telebot.types.Message) -> None:
-            lt = self.helper.db.getMostRecentLeistungstag()
+            try:
+                lt_number = int(message.text)
+            except:
+                self.bot.send_message(message.chat.id, "Host du in da Voikschui ned aufpasst wos a nummer is? Probiers numoi ...")
+
+            lt = self.helper.db.getLeistungstagByNumber(lt_number)
+            if lt is None:
+                self.bot.send_message(message.chat.id, "Den Leistungstog find i ned. Schau numoi genau")
+                return
+
             print(f'Location {lt["location"]}')
 
-            # TODO: Check if leistungstag exists
-            # TODO: Edit poll message, if possible
+            if not message.from_user.id in self.user_context:
+                self.user_context[message.from_user.id] = { "leistungstag": lt }
+            else:
+                self.user_context[message.from_user.id]["leistungstag"] = lt
 
             self.bot.send_message(message.chat.id, "Passt. Wo schau ma stottdessen hin?", reply_markup=self.helper.location_keyboard())
             self.bot.set_state(message.from_user.id, LeistungsState.switcherooAlternateLocation, message.chat.id)
 
-            return
-
         @bot.message_handler(state=LeistungsState.switcherooAlternateLocation)
         def switcheroo_alternate_location(message: telebot.types.Message) -> None:
+            if (not message.from_user.id in self.user_context or
+                not "leistungstag" in self.user_context[message.from_user.id] or
+                self.user_context[message.from_user.id]["leistungstag"] is None):
+                self.bot.send_message(message.chat.id, "Could not find Leistungstag in UserContext. This should not happen, please try again ...")
+                self.bot.delete_state()
+                return
+
             location = message.text.strip()
             # check if location exists in database
             info = self.helper.db.getLocationInfo(location)
+
+            if not info:
+                self.bot.send_message(
+                    message.chat.id,
+                    f"'{location}' kenn i ned..wüstas stattdessn zur listn dazua gebn?",
+                    reply_markup=self.helper.unkown_location_button(location),
+                )
+                self.bot.set_state(
+                    message.from_user.id,
+                    LeistungsState.searchLocation,
+                    message.chat.id,
+                )
+
+            else:
+                lt = self.user_context[message.from_user.id]["leistungstag"]
+                self.helper.db.switchLeistungstagLocation(lt["key"], lt["location"], info["key"])
+
+                self.bot.send_message(message.from_user.id, f"Ok, donn gemma am {lt["date"].strftime("%d.%m.%Y")} ins {info["name"]}")
+                self.bot.delete_state()
+
+            self.user_context[message.from_user.id]["leistungstag"] = None
+            # TODO: Edit poll message, if possible
 
         @bot.message_handler(commands="switcheroo")
         def switcheroo(message: telebot.types.Message) -> None:
