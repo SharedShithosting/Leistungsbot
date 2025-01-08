@@ -46,8 +46,8 @@ jobs:
             type=schedule
             type=ref,event=branch
             type=ref,event=pr
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=${{ steps.read_version.outputs.value }},enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=${{ steps.read_version.outputs.value }}
             type=sha
       - name: Login to Docker Hub
         if: github.event_name != 'pull_request'
