@@ -4,7 +4,7 @@ FROM python:${PYTHON_VERSION} as base
 
 FROM base as builder
 # --- Install Poetry ---
-ARG POETRY_VERSION=1.8
+ARG POETRY_VERSION=2.0.0
 
 ENV POETRY_HOME=/opt/poetry
 ENV POETRY_NO_INTERACTION=1
