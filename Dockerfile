@@ -1,8 +1,8 @@
 ARG PYTHON_VERSION=3.12-slim
 
-FROM python:${PYTHON_VERSION} as base
+FROM python:${PYTHON_VERSION} AS base
 
-FROM base as builder
+FROM base AS builder
 # --- Install Poetry ---
 ARG POETRY_VERSION=2.0.0
 
@@ -30,7 +30,7 @@ RUN poetry install --no-root --without=dev && rm -rf $POETRY_CACHE_DIR
 
 # Now let's build the runtime image from the builder.
 #   We'll just copy the env and the PATH reference.
-FROM base as runtime
+FROM base AS runtime
 
 WORKDIR /usr/src/app
 COPY leistungsbot ./leistungsbot
