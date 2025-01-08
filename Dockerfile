@@ -23,6 +23,7 @@ WORKDIR /app
 # You can comment the following two lines if you prefer to manually install
 #   the dependencies from inside the container.
 COPY pyproject.toml poetry.lock  ./
+RUN cat ./pyproject.toml
 
 # Install the dependencies and clear the cache afterwards.
 #   This may save some MBs.
@@ -34,6 +35,7 @@ FROM base AS runtime
 
 WORKDIR /usr/src/app
 COPY leistungsbot ./leistungsbot
+RUN cat ./leistungsbot/_version.py
 
 ENV VIRTUAL_ENV=/app/.venv
 ENV PATH="/app/.venv/bin:$PATH"

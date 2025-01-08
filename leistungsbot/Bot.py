@@ -24,6 +24,7 @@ from telebot.storage import StateMemoryStorage
 from telegram_bot_calendar import DetailedTelegramCalendar
 from telegram_bot_calendar import LSTEP
 
+from leistungsbot import _version
 from leistungsbot import leistungs_config as lc
 from leistungsbot.BotHelper import Helper
 from leistungsbot.BotHelper import LeistungsTyp
@@ -31,7 +32,6 @@ from leistungsbot.BotHelper import PersistantLeistungsTagPoller
 from leistungsbot.BotScheduler import Scheduler
 from leistungsbot.google_place import Openness
 from leistungsbot.leistungs_returns import LeistungsReturnCodes
-from leistungsbot.package import _version
 
 # States storage
 # Now, you can pass storage to bot.
