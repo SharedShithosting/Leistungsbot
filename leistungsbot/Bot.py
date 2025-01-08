@@ -1205,9 +1205,10 @@ class LeistungsBot:
         elif info["visited"]:
             self.bot.reply_to(
                 message,
-                "Do woan ma schomoi, suach da wos aunders.",
+                "Do woan ma schomoi, i hoff du wast wost duast.",
             )
             self.bot.delete_state(message.from_user.id, message.chat.id)
+            return location
         else:
             self.bot.delete_state(message.from_user.id, message.chat.id)
             return location
