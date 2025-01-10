@@ -30,6 +30,10 @@ async def init_bot(application: Application) -> None:
     await application.bot.set_my_commands(Commands.as_list())
 
 async def timeout(update: Update, context: LeistungsbotContext) -> int:
+    if update.effective_chat is None:
+        print("No effective chat in leistungpoll", file=sys.stderr)
+        return ConversationHandler.END
+
     await context.bot.send_message(update.effective_chat.id, "Hiaz denkst nummoi noch, wost eigentlich wüst und donn fongst nummoi vo vorn on!")
     return ConversationHandler.END
 
@@ -39,19 +43,24 @@ def start_bot(token: str) -> None:
 
     conv_handler = ConversationHandler(
         entry_points=[
+            CommandHandler(Commands.HELP.command, leistungsbot.handlers.general.help),
+            CommandHandler(Commands.ALIVE.command, leistungsbot.handlers.general.alive),
+            CommandHandler(Commands.VERSION.command, leistungsbot.handlers.general.version),
+            CommandHandler(Commands.MESSAGE.command, leistungsbot.handlers.general.message),
+            CommandHandler(Commands.SENDNUDES.command, leistungsbot.handlers.general.send_nudes),
+
             CommandHandler(Commands.LEISTUNGSPOLL.command, leistungsbot.handlers.polls.leistungspoll),
             CommandHandler(Commands.ZUSATZPOLL.command, leistungsbot.handlers.polls.leistungspoll),
             CommandHandler(Commands.KONKURRENZPOLL.command, leistungsbot.handlers.polls.leistungspoll),
-            CommandHandler(Commands.HELP.command, leistungsbot.handlers.general.help),
-            CommandHandler(Commands.SENDNUDES.command, leistungsbot.handlers.general.send_nudes),
             CommandHandler(Commands.HISTORY.command, leistungsbot.handlers.history.history_send_kind),
         ],
         states={
             ConversationState.HISTORY_SELECT_KIND: [CallbackQueryHandler(leistungsbot.handlers.history.history_send_leistungstag)],
+            ConversationState.MESSAGE: [MessageHandler(None, leistungsbot.handlers.general.message_send_message)],
             ConversationState.LEISTUNGSPOLL_SELECT_LOCATION: [MessageHandler(None, leistungsbot.handlers.polls.leistungspoll_location)],
             ConversationHandler.TIMEOUT: [MessageHandler(None, timeout), CallbackQueryHandler(timeout)]
         },
-        fallbacks=[CommandHandler("cancel", leistungsbot.handlers.general.cancel)],
+        fallbacks=[CommandHandler(Commands.CANCEL.command, leistungsbot.handlers.general.cancel)],
         conversation_timeout=timedelta(seconds=30)
     )
 

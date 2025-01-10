@@ -5,23 +5,23 @@ HELP = BotCommand("help", "Display help message")
 ALIVE = BotCommand("alive", "Check if I am up")
 VERSION = BotCommand("version", "Display help message")
 MESSAGE = BotCommand("message", "Send custom message")
-SENDNUDES = BotCommand("sendnudes", "😈")
+SENDNUDES = BotCommand("send_nudes", "😈")
 CANCEL = BotCommand("cancel", "Cancel current conversation")
 
 # Polls/Leistungstage
 LEISTUNGSPOLL = BotCommand("leistungspoll", "Create a new poll for next week")
 KONKURRENZPOLL = BotCommand("konkurrenzpoll", "Create a new konkurrenz poll for next week")
 ZUSATZPOLL = BotCommand("zusatzpoll", "Create a new zusatz poll")
-CLOSEPOLL = BotCommand("closepoll", "Close a poll")
-SNEAKY_CLOSEPOLL = BotCommand("sneaky_closepoll", "Close a poll without any notification")
-PURGE = BotCommand("purge", "Delete a poll")
-HISTORY = BotCommand("history", "Show past leistungstage")
+CLOSEPOLL = BotCommand("poll_close", "Close a poll")
+SNEAKY_CLOSEPOLL = BotCommand("poll_close_sneaky", "Close a poll without any notification")
+PURGE = BotCommand("poll_purge", "Delete a poll")
+HISTORY = BotCommand("poll_history", "Show past leistungstage")
 
 # Locations
-ADD_LOCATION = BotCommand("add_location", "Add a new location recommendation")
-REMOVE_LOCATION = BotCommand("remove_location", "Remove a unvisited location")
-SHOW_LOCATION = BotCommand("show_location", "Show unvisited locations")
-RATE_LOCATION = BotCommand("rate_location", "Rate the most recent location")
+LOCATION_ADD = BotCommand("location_add", "Add a new location recommendation")
+LOCATION_REMOVE = BotCommand("location_remove", "Remove a unvisited location")
+LOCATIONS_SHOW = BotCommand("locations_show", "Show unvisited locations")
+LOCATION_RATE = BotCommand("location_rate", "Rate the most recent location")
 
 def as_list() -> list[BotCommand]:
     # Python hack to get all the BotCommands defined above as list
