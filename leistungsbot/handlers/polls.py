@@ -42,4 +42,13 @@ async def leistungspoll(update: Update, context: LeistungsbotContext) -> int:
     return ConversationState.LEISTUNGSPOLL_SELECT_LOCATION
 
 async def leistungspoll_location(update: Update, context: LeistungsbotContext) -> int:
+    if update.effective_chat is None:
+        print("No effective chat in leistungpoll", file=sys.stderr)
+        return ConversationHandler.END
+
+    if update.message is None or update.message.text is None:
+        await context.bot.send_message(update.effective_chat.id, "Du muast a location senden")
+        return ConversationState.LEISTUNGSPOLL_SELECT_LOCATION
+
+    location_name = update.message.text.strip()
     return ConversationHandler.END
