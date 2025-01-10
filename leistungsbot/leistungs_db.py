@@ -38,7 +38,7 @@ class LeistungsDB:
                 user=lc.config["mysql"]["user"],
                 password=lc.config["mysql"]["password"],
                 ssl_disabled=True,
-                collation='utf8mb4_general_ci'
+                collation="utf8mb4_general_ci",
             )
             return True
         except Exception as e:

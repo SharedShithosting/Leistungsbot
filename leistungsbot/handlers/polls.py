@@ -1,10 +1,17 @@
+from __future__ import annotations
+
 import sys
-from telegram import ReplyKeyboardMarkup, Update
+
+from telegram import ReplyKeyboardMarkup
+from telegram import Update
 from telegram.ext import ConversationHandler
 
 from leistungsbot import Commands
 from leistungsbot.Conversation import ConversationState
-from leistungsbot.LeistungbotContext import LeistungsbotContext, Leistungstag, LeistungstagKind
+from leistungsbot.LeistungbotContext import LeistungsbotContext
+from leistungsbot.LeistungbotContext import Leistungstag
+from leistungsbot.LeistungbotContext import LeistungstagKind
+
 
 async def leistungspoll(update: Update, context: LeistungsbotContext) -> int:
     if update.effective_chat is None:
@@ -12,16 +19,21 @@ async def leistungspoll(update: Update, context: LeistungsbotContext) -> int:
         return ConversationHandler.END
 
     if context.user_data is None:
-        await context.bot.send_message(update.effective_chat.id, "No userdata found")
+        await context.bot.send_message(
+            update.effective_chat.id, "No userdata found"
+        )
         return ConversationHandler.END
 
-
     locations = context.bot_data["oldlb"].helper.db.getVirgineLocations()
-    keyboard = ReplyKeyboardMarkup.from_column([l[0] for l in reversed(locations)], one_time_keyboard=True)
+    keyboard = ReplyKeyboardMarkup.from_column(
+        [l[0] for l in reversed(locations)], one_time_keyboard=True
+    )
 
-    await context.bot.send_message(update.effective_chat.id,
-                "Schick de nexte location muaz",
-                reply_markup=keyboard)
+    await context.bot.send_message(
+        update.effective_chat.id,
+        "Schick de nexte location muaz",
+        reply_markup=keyboard,
+    )
 
     lt = Leistungstag()
     if update.message is not None and update.message.text is not None:
@@ -41,13 +53,18 @@ async def leistungspoll(update: Update, context: LeistungsbotContext) -> int:
 
     return ConversationState.LEISTUNGSPOLL_SELECT_LOCATION
 
-async def leistungspoll_location(update: Update, context: LeistungsbotContext) -> int:
+
+async def leistungspoll_location(
+    update: Update, context: LeistungsbotContext
+) -> int:
     if update.effective_chat is None:
         print("No effective chat in leistungpoll", file=sys.stderr)
         return ConversationHandler.END
 
     if update.message is None or update.message.text is None:
-        await context.bot.send_message(update.effective_chat.id, "Du muast a location senden")
+        await context.bot.send_message(
+            update.effective_chat.id, "Du muast a location senden"
+        )
         return ConversationState.LEISTUNGSPOLL_SELECT_LOCATION
 
     location_name = update.message.text.strip()

@@ -1,5 +1,8 @@
+from __future__ import annotations
 
-from enum import IntEnum, auto
+from enum import auto
+from enum import IntEnum
+
 
 class ConversationState(IntEnum):
     HISTORY_SELECT_KIND = auto()
