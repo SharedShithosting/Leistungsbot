@@ -45,7 +45,8 @@ async def version(update: Update, context: LeistungsbotContext) -> int:
         return ConversationHandler.END
 
     await context.bot.send_message(
-        update.effective_chat.id, f"LeistungsBot - {_version.__version__}"
+        update.effective_chat.id,
+        f"LeistungsBot - {_version.__version__}",
     )
 
     return ConversationHandler.END
@@ -57,14 +58,16 @@ async def message(update: Update, context: LeistungsbotContext) -> int:
         return ConversationHandler.END
 
     await context.bot.send_message(
-        update.effective_chat.id, "Wos soll i sogen?"
+        update.effective_chat.id,
+        "Wos soll i sogen?",
     )
 
     return ConversationState.MESSAGE
 
 
 async def message_send_message(
-    update: Update, context: LeistungsbotContext
+    update: Update,
+    context: LeistungsbotContext,
 ) -> int:
     if update.effective_chat is None:
         print("No effective chat in leistungpoll", file=sys.stderr)
@@ -72,12 +75,14 @@ async def message_send_message(
 
     if update.message is None or update.message.text is None:
         await context.bot.send_message(
-            update.effective_chat.id, "Du soist ma nochricht schicken!"
+            update.effective_chat.id,
+            "Du soist ma nochricht schicken!",
         )
         return ConversationState.MESSAGE
 
     await context.bot.send_message(
-        lc.config["leistungschat_id"], update.message.text
+        lc.config["leistungschat_id"],
+        update.message.text,
     )
 
     return ConversationHandler.END
@@ -98,6 +103,7 @@ async def cancel(update: Update, context: LeistungsbotContext) -> int:
         return ConversationHandler.END
 
     await context.bot.send_message(
-        update.effective_chat.id, "Donn hoid ned. Brauchst sunst nu wos?"
+        update.effective_chat.id,
+        "Donn hoid ned. Brauchst sunst nu wos?",
     )
     return ConversationHandler.END

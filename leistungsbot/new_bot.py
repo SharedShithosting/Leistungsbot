@@ -59,7 +59,7 @@ def start_bot(token: str) -> None:
                 context=LeistungsbotContext,
                 user_data=UserContext,
                 bot_data=BotContext,
-            )
+            ),
         )
         .build()
     )
@@ -68,16 +68,20 @@ def start_bot(token: str) -> None:
     conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler(
-                Commands.HELP.command, leistungsbot.handlers.general.help
+                Commands.HELP.command,
+                leistungsbot.handlers.general.help,
             ),
             CommandHandler(
-                Commands.ALIVE.command, leistungsbot.handlers.general.alive
+                Commands.ALIVE.command,
+                leistungsbot.handlers.general.alive,
             ),
             CommandHandler(
-                Commands.VERSION.command, leistungsbot.handlers.general.version
+                Commands.VERSION.command,
+                leistungsbot.handlers.general.version,
             ),
             CommandHandler(
-                Commands.MESSAGE.command, leistungsbot.handlers.general.message
+                Commands.MESSAGE.command,
+                leistungsbot.handlers.general.message,
             ),
             CommandHandler(
                 Commands.SENDNUDES.command,
@@ -103,18 +107,20 @@ def start_bot(token: str) -> None:
         states={
             ConversationState.HISTORY_SELECT_KIND: [
                 CallbackQueryHandler(
-                    leistungsbot.handlers.history.history_send_leistungstag
-                )
+                    leistungsbot.handlers.history.history_send_leistungstag,
+                ),
             ],
             ConversationState.MESSAGE: [
                 MessageHandler(
-                    None, leistungsbot.handlers.general.message_send_message
-                )
+                    None,
+                    leistungsbot.handlers.general.message_send_message,
+                ),
             ],
             ConversationState.LEISTUNGSPOLL_SELECT_LOCATION: [
                 MessageHandler(
-                    None, leistungsbot.handlers.polls.leistungspoll_location
-                )
+                    None,
+                    leistungsbot.handlers.polls.leistungspoll_location,
+                ),
             ],
             ConversationHandler.TIMEOUT: [
                 MessageHandler(None, timeout),
@@ -123,8 +129,9 @@ def start_bot(token: str) -> None:
         },
         fallbacks=[
             CommandHandler(
-                Commands.CANCEL.command, leistungsbot.handlers.general.cancel
-            )
+                Commands.CANCEL.command,
+                leistungsbot.handlers.general.cancel,
+            ),
         ],
         conversation_timeout=timedelta(seconds=30),
     )

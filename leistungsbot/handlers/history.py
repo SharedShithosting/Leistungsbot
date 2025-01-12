@@ -12,22 +12,26 @@ from leistungsbot.LeistungbotContext import LeistungsbotContext
 
 
 async def history_send_kind(
-    update: Update, context: LeistungsbotContext
+    update: Update,
+    context: LeistungsbotContext,
 ) -> int:
     context.bot_data["oldlb"].process_history(update.message)
     return ConversationState.HISTORY_SELECT_KIND
 
 
 async def history_send_leistungstag(
-    update: Update, context: LeistungsbotContext
+    update: Update,
+    context: LeistungsbotContext,
 ) -> int:
     if update.callback_query is not None and isinstance(
-        update.callback_query.data, str
+        update.callback_query.data,
+        str,
     ):
         data = json.loads(update.callback_query.data)
     else:
         await context.bot.send_message(
-            update.effective_chat.id, "Something went wrong."
+            update.effective_chat.id,
+            "Something went wrong.",
         )
 
     return ConversationHandler.END
