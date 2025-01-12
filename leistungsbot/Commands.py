@@ -12,14 +12,10 @@ CANCEL = BotCommand("cancel", "Cancel current conversation")
 
 # Polls/Leistungstage
 LEISTUNGSPOLL = BotCommand("leistungspoll", "Create a new poll for next week")
-KONKURRENZPOLL = BotCommand(
-    "konkurrenzpoll", "Create a new konkurrenz poll for next week"
-)
+KONKURRENZPOLL = BotCommand("konkurrenzpoll", "Create a new konkurrenz poll for next week")
 ZUSATZPOLL = BotCommand("zusatzpoll", "Create a new zusatz poll")
 CLOSEPOLL = BotCommand("poll_close", "Close a poll")
-SNEAKY_CLOSEPOLL = BotCommand(
-    "poll_close_sneaky", "Close a poll without any notification"
-)
+SNEAKY_CLOSEPOLL = BotCommand("poll_close_sneaky", "Close a poll without any notification")
 PURGE = BotCommand("poll_purge", "Delete a poll")
 HISTORY = BotCommand("poll_history", "Show past leistungstage")
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 import sys
 
 from telegram import ReplyKeyboardMarkup
@@ -8,7 +9,7 @@ from telegram.ext import ConversationHandler
 
 from leistungsbot import Commands
 from leistungsbot.Conversation import ConversationState
-from leistungsbot.LeistungbotContext import LeistungsbotContext
+from leistungsbot.LeistungbotContext import LeistungsbotContext, Location
 from leistungsbot.LeistungbotContext import Leistungstag
 from leistungsbot.LeistungbotContext import LeistungstagKind
 
@@ -61,6 +62,10 @@ async def leistungspoll_location(
         print("No effective chat in leistungpoll", file=sys.stderr)
         return ConversationHandler.END
 
+    if context.user_data is None:
+        print("Userdata is missing", file=sys.stderr)
+        return ConversationHandler.END
+
     if update.message is None or update.message.text is None:
         await context.bot.send_message(
             update.effective_chat.id, "Du muast a location senden"
@@ -68,4 +73,23 @@ async def leistungspoll_location(
         return ConversationState.LEISTUNGSPOLL_SELECT_LOCATION
 
     location_name = update.message.text.strip()
-    return ConversationHandler.END
+    location_info = context.bot_data["oldlb"].helper.db.getLocationInfo(location_name)
+
+    if location_name is None:
+        await context.bot.send_message(update.effective_chat.id, f'"{location_name} kenn i ned ..')
+        # TODO: Jump to add_location
+        return ConversationState.LEISTUNGSPOLL_SELECT_LOCATION
+
+    elif location_info["visited"]:
+        await context.bot.send_message(update.effective_chat.id, "Do woan ma scho amal. I hoff du woast wos du duast!", reply_to_message_id=update.message.id)
+
+    context.user_data["location"] = Location(location_info["key"], location_info["name"])
+
+    if context.user_data["leistungstag"].kind == LeistungstagKind.ZUSATZ:
+        return ConversationState.LEISTUNGSPOLL_SELECT_DATE
+    else:
+        return ConversationState.LEISTUNGSPOLL_PRESELECT_DATE
+
+def get_next_tuesday() -> datetime:
+    next_tuesday = datetime.now() + timedelta(days=(8 - datetime.now().weekday()) % 8)
+    return datetime(next_tuesday.year, next_tuesday.month, next_tuesday.day, 19, 0, 0, 0)
