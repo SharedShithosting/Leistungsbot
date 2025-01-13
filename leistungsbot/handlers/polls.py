@@ -4,7 +4,7 @@ import sys
 from datetime import datetime
 from datetime import timedelta
 
-from telegram import ReplyKeyboardMarkup
+from telegram import InlineKeyboardMarkup, ReplyKeyboardMarkup
 from telegram import Update
 from telegram.ext import ConversationHandler
 
@@ -104,6 +104,8 @@ async def leistungspoll_location(
     if context.user_data["leistungstag"].kind == LeistungstagKind.ZUSATZ:
         return ConversationState.LEISTUNGSPOLL_SELECT_DATE
     else:
+        leistungstag_date = get_next_tuesday()
+
         return ConversationState.LEISTUNGSPOLL_PRESELECT_DATE
 
 
@@ -114,3 +116,6 @@ def get_next_tuesday() -> datetime:
     return datetime(
         next_tuesday.year, next_tuesday.month, next_tuesday.day, 19, 0, 0, 0
     )
+
+def preselect_date_keyboard() -> InlineKeyboardMarkup:
+    pass

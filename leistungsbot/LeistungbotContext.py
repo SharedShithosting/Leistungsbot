@@ -19,15 +19,15 @@ class LeistungstagKind(IntEnum):
 
 @dataclass
 class Location:
-    id: int
-    name: str
+    id: int | None = None
+    name: str | None = None
 
 
 @dataclass
 class Leistungstag:
-    kind: LeistungstagKind
-    location_id: int
-    datetime: datetime
+    kind: LeistungstagKind | None = None
+    location_id: int | None = None
+    datetime: datetime | None = None
 
 
 class UserContext(TypedDict, total=False):

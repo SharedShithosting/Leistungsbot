@@ -4,6 +4,7 @@ import json
 from datetime import timedelta
 from enum import auto
 from enum import IntEnum
+import sys
 from typing import TypedDict
 
 from telegram import ReplyKeyboardMarkup
