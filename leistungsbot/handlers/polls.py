@@ -4,7 +4,8 @@ import sys
 from datetime import datetime
 from datetime import timedelta
 
-from telegram import InlineKeyboardMarkup, ReplyKeyboardMarkup
+from telegram import InlineKeyboardMarkup
+from telegram import ReplyKeyboardMarkup
 from telegram import Update
 from telegram.ext import ConversationHandler
 
@@ -80,12 +81,13 @@ async def leistungspoll_location(
 
     location_name = update.message.text.strip()
     location_info = context.bot_data["oldlb"].helper.db.getLocationInfo(
-        location_name
+        location_name,
     )
 
     if location_name is None:
         await context.bot.send_message(
-            update.effective_chat.id, f'"{location_name} kenn i ned ..'
+            update.effective_chat.id,
+            f'"{location_name} kenn i ned ..',
         )
         # TODO: Jump to add_location
         return ConversationState.LEISTUNGSPOLL_SELECT_LOCATION
@@ -98,7 +100,8 @@ async def leistungspoll_location(
         )
 
     context.user_data["location"] = Location(
-        location_info["key"], location_info["name"]
+        location_info["key"],
+        location_info["name"],
     )
 
     if context.user_data["leistungstag"].kind == LeistungstagKind.ZUSATZ:
@@ -111,11 +114,18 @@ async def leistungspoll_location(
 
 def get_next_tuesday() -> datetime:
     next_tuesday = datetime.now() + timedelta(
-        days=(8 - datetime.now().weekday()) % 8
+        days=(8 - datetime.now().weekday()) % 8,
     )
     return datetime(
-        next_tuesday.year, next_tuesday.month, next_tuesday.day, 19, 0, 0, 0
+        next_tuesday.year,
+        next_tuesday.month,
+        next_tuesday.day,
+        19,
+        0,
+        0,
+        0,
     )
+
 
 def preselect_date_keyboard() -> InlineKeyboardMarkup:
     pass

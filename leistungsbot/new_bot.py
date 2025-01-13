@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
+import sys
 from datetime import timedelta
 from enum import auto
 from enum import IntEnum
-import sys
 from typing import TypedDict
 
 from telegram import ReplyKeyboardMarkup
