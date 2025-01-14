@@ -83,6 +83,7 @@ async def message_send_message(
     await context.bot.send_message(
         lc.config["leistungschat_id"],
         update.message.text,
+        parse_mode='MarkdownV2'
     )
 
     return ConversationHandler.END
