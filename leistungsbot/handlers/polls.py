@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import calendar
 import json
 import sys
-from datetime import date, datetime
-from datetime import timedelta
+import datetime
+import time
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram import ReplyKeyboardMarkup
@@ -109,7 +110,7 @@ async def leistungspoll_location(
 
     if context.user_data["leistungstag"].kind == LeistungstagKind.ZUSATZ:
         calendar, step = DetailedTelegramCalendar(
-            min_date=date.today(),
+            min_date=datetime.date.today(),
         ).build()
         keyboard = InlineKeyboardMarkup.de_json(json.loads(calendar))
         await context.bot.send_message(
@@ -127,9 +128,9 @@ async def leistungspoll_select_date(update: Update, context: LeistungsbotContext
         print("No effective chat in leistungpoll", file=sys.stderr)
         return ConversationHandler.END
 
-    # if context.user_data is None:
-    #     print("Userdata is missing", file=sys.stderr)
-    #     return ConversationHandler.END
+    if context.user_data is None:
+        print("Userdata is missing", file=sys.stderr)
+        return ConversationHandler.END
 
     if update.callback_query is None:
         await context.bot.send_message(update.effective_chat.id, "Du muast auf de buttons drucken!")
@@ -139,12 +140,15 @@ async def leistungspoll_select_date(update: Update, context: LeistungsbotContext
         await context.bot.send_message(update.effective_chat.id, "I konn mei Nochricht nimma finden. Fong ma neich on ...")
         return ConversationHandler.END
 
-    result, calendar, step = DetailedTelegramCalendar(
-        min_date=date.today(),
-    ).process(update.callback_query.data)
+    result: datetime.date
+    keyboard_json: str
+    step: str
+    result, keyboard_json, step = DetailedTelegramCalendar(
+            min_date=datetime.date.today(),
+        ).process(update.callback_query.data)
 
-    if not result and calendar:
-        keyboard = InlineKeyboardMarkup.de_json(json.loads(calendar))
+    if not result and keyboard_json:
+        keyboard = InlineKeyboardMarkup.de_json(json.loads(keyboard_json))
         await context.bot.edit_message_text(
             f"Select {LSTEP[step]}",
             update.effective_chat.id,
@@ -160,30 +164,35 @@ async def leistungspoll_select_date(update: Update, context: LeistungsbotContext
             update.effective_chat.id,
             update.callback_query.message.message_id,
         )
-        if not self.poller:
-            self.helper.bot.send_message(
-                call.message.chat_id,
-                "Da is wohl was schiefglaufen, i kann ka poll findn...",
-            )
-            return
-        if (
-            self.poller.type == LeistungsTyp.NORMAL
-            or self.poller.type == LeistungsTyp.KONKURENZ
-        ) and result.weekday() != 1:
-            self.helper.bot.send_message(
-                call.message.chat.id,
+
+        lt_time = datetime.time(19, 0, 0)
+
+        context.user_data["leistungstag"].datetime = datetime.datetime.combine(result, lt_time)
+
+        # if not self.poller:
+        #     self.helper.bot.send_message(
+        #         call.message.chat_id,
+        #         "Da is wohl was schiefglaufen, i kann ka poll findn...",
+        #     )
+        #     return
+        if ((context.user_data["leistungstag"].kind == LeistungstagKind.NORMAL or context.user_data["leistungstag"].kind == LeistungstagKind.KONKURENZ) and
+                result.weekday() != calendar.TUESDAY):
+
+            await context.bot.send_message(
+                update.effective_chat.id,
                 "Blasphemie, des is ka Dienstag wast da du do ausgsuacht hast...alles auf eigene Gefahr!",
             )
             time.sleep(1)
 
         return ConversationState.LEISTUNGSPOLL_PREVIEW
 
-    return 0
+    print("This state should not be reached", file=sys.stderr)
+    return ConversationHandler.END
 
 
-def get_next_tuesday() -> datetime:
-    next_tuesday = datetime.now() + timedelta(
-        days=(8 - datetime.now().weekday()) % 8,
+def get_next_tuesday() -> datetime.datetime:
+    next_tuesday = datetime.datetime.now() + datetime.timedelta(
+        days=(8 - datetime.datetime.now().weekday()) % 8,
     )
     return datetime(
         next_tuesday.year,
