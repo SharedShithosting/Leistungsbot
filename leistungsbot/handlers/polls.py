@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import json
 import sys
-from datetime import datetime
+from datetime import date, datetime
 from datetime import timedelta
 
-from telegram import InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram import ReplyKeyboardMarkup
 from telegram import Update
 from telegram.ext import ConversationHandler
+
+from telegram_bot_calendar import DetailedTelegramCalendar, LSTEP
 
 from leistungsbot import Commands
 from leistungsbot.Conversation import ConversationState
@@ -105,11 +108,77 @@ async def leistungspoll_location(
     )
 
     if context.user_data["leistungstag"].kind == LeistungstagKind.ZUSATZ:
+        calendar, step = DetailedTelegramCalendar(
+            min_date=date.today(),
+        ).build()
+        keyboard = InlineKeyboardMarkup.de_json(json.loads(calendar))
+        await context.bot.send_message(
+            update.effective_chat.id,
+            f"Select {LSTEP[step]}",
+            reply_markup=keyboard,
+        )
         return ConversationState.LEISTUNGSPOLL_SELECT_DATE
     else:
-        leistungstag_date = get_next_tuesday()
-
+        await context.bot.send_message(update.effective_chat.id, "Für wonn damma pollen?", reply_markup=preselect_date_keyboard())
         return ConversationState.LEISTUNGSPOLL_PRESELECT_DATE
+
+async def leistungspoll_select_date(update: Update, context: LeistungsbotContext) -> int:
+    if update.effective_chat is None:
+        print("No effective chat in leistungpoll", file=sys.stderr)
+        return ConversationHandler.END
+
+    # if context.user_data is None:
+    #     print("Userdata is missing", file=sys.stderr)
+    #     return ConversationHandler.END
+
+    if update.callback_query is None:
+        await context.bot.send_message(update.effective_chat.id, "Du muast auf de buttons drucken!")
+        return ConversationState.LEISTUNGSPOLL_SELECT_DATE
+
+    if update.callback_query.message is None:
+        await context.bot.send_message(update.effective_chat.id, "I konn mei Nochricht nimma finden. Fong ma neich on ...")
+        return ConversationHandler.END
+
+    result, calendar, step = DetailedTelegramCalendar(
+        min_date=date.today(),
+    ).process(update.callback_query.data)
+
+    if not result and calendar:
+        keyboard = InlineKeyboardMarkup.de_json(json.loads(calendar))
+        await context.bot.edit_message_text(
+            f"Select {LSTEP[step]}",
+            update.effective_chat.id,
+            update.callback_query.message.message_id,
+            reply_markup=keyboard,
+        )
+
+        return ConversationState.LEISTUNGSPOLL_SELECT_DATE
+
+    elif result:
+        await context.bot.edit_message_text(
+            f"You selected {result}",
+            update.effective_chat.id,
+            update.callback_query.message.message_id,
+        )
+        if not self.poller:
+            self.helper.bot.send_message(
+                call.message.chat_id,
+                "Da is wohl was schiefglaufen, i kann ka poll findn...",
+            )
+            return
+        if (
+            self.poller.type == LeistungsTyp.NORMAL
+            or self.poller.type == LeistungsTyp.KONKURENZ
+        ) and result.weekday() != 1:
+            self.helper.bot.send_message(
+                call.message.chat.id,
+                "Blasphemie, des is ka Dienstag wast da du do ausgsuacht hast...alles auf eigene Gefahr!",
+            )
+            time.sleep(1)
+
+        return ConversationState.LEISTUNGSPOLL_PREVIEW
+
+    return 0
 
 
 def get_next_tuesday() -> datetime:
@@ -128,4 +197,8 @@ def get_next_tuesday() -> datetime:
 
 
 def preselect_date_keyboard() -> InlineKeyboardMarkup:
-    pass
+    next_tuesday = get_next_tuesday()
+    options = [InlineKeyboardButton(next_tuesday.strftime("%d.%m.%Y"), callback_data=next_tuesday.isoformat()),
+                InlineKeyboardButton("Ondas Datum", callback_data="*")]
+
+    return InlineKeyboardMarkup.from_column(options)
