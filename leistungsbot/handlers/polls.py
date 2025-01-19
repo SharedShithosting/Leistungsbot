@@ -1,17 +1,18 @@
 from __future__ import annotations
 
 import calendar
+import datetime
 import json
 import sys
-import datetime
 import time
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton
+from telegram import InlineKeyboardMarkup
 from telegram import ReplyKeyboardMarkup
 from telegram import Update
 from telegram.ext import ConversationHandler
-
-from telegram_bot_calendar import DetailedTelegramCalendar, LSTEP
+from telegram_bot_calendar import DetailedTelegramCalendar
+from telegram_bot_calendar import LSTEP
 
 from leistungsbot import Commands
 from leistungsbot.Conversation import ConversationState
@@ -112,10 +113,17 @@ async def leistungspoll_location(
         await send_calendar_keyboard(update.effective_chat.id, context)
         return ConversationState.LEISTUNGSPOLL_SELECT_DATE
     else:
-        await context.bot.send_message(update.effective_chat.id, "Für wonn damma pollen?", reply_markup=preselect_date_keyboard())
+        await context.bot.send_message(
+            update.effective_chat.id,
+            "Für wonn damma pollen?",
+            reply_markup=preselect_date_keyboard(),
+        )
         return ConversationState.LEISTUNGSPOLL_PRESELECT_DATE
 
-async def leistungpoll_preselect_date(update: Update, context: LeistungsbotContext) -> int:
+
+async def leistungpoll_preselect_date(
+    update: Update, context: LeistungsbotContext
+) -> int:
     if update.effective_chat is None:
         print("No effective chat in leistungpoll", file=sys.stderr)
         return ConversationHandler.END
@@ -124,12 +132,17 @@ async def leistungpoll_preselect_date(update: Update, context: LeistungsbotConte
         print("Userdata is missing", file=sys.stderr)
         return ConversationHandler.END
 
-    if "leistungstag" not in context.user_data or context.user_data["leistungstag"] is None:
+    if (
+        "leistungstag" not in context.user_data
+        or context.user_data["leistungstag"] is None
+    ):
         print("Leistungstag is missing", file=sys.stderr)
         return ConversationHandler.END
 
     if update.callback_query is None or update.callback_query.data is None:
-        await context.bot.send_message(update.effective_chat.id, "Du muast auf de buttons drucken!")
+        await context.bot.send_message(
+            update.effective_chat.id, "Du muast auf de buttons drucken!"
+        )
         return ConversationState.LEISTUNGSPOLL_PRESELECT_DATE
 
     if update.callback_query.data == "*":
@@ -142,7 +155,9 @@ async def leistungpoll_preselect_date(update: Update, context: LeistungsbotConte
         return ConversationState.LEISTUNGSPOLL_PREVIEW
 
 
-async def leistungspoll_select_date(update: Update, context: LeistungsbotContext) -> int:
+async def leistungspoll_select_date(
+    update: Update, context: LeistungsbotContext
+) -> int:
     if update.effective_chat is None:
         print("No effective chat in leistungpoll", file=sys.stderr)
         return ConversationHandler.END
@@ -152,19 +167,24 @@ async def leistungspoll_select_date(update: Update, context: LeistungsbotContext
         return ConversationHandler.END
 
     if update.callback_query is None:
-        await context.bot.send_message(update.effective_chat.id, "Du muast auf de buttons drucken!")
+        await context.bot.send_message(
+            update.effective_chat.id, "Du muast auf de buttons drucken!"
+        )
         return ConversationState.LEISTUNGSPOLL_SELECT_DATE
 
     if update.callback_query.message is None:
-        await context.bot.send_message(update.effective_chat.id, "I konn mei Nochricht nimma finden. Fong ma neich on ...")
+        await context.bot.send_message(
+            update.effective_chat.id,
+            "I konn mei Nochricht nimma finden. Fong ma neich on ...",
+        )
         return ConversationHandler.END
 
     result: datetime.date
     keyboard_json: str
     step: str
     result, keyboard_json, step = DetailedTelegramCalendar(
-            min_date=datetime.date.today(),
-        ).process(update.callback_query.data)
+        min_date=datetime.date.today(),
+    ).process(update.callback_query.data)
 
     if not result and keyboard_json:
         keyboard = InlineKeyboardMarkup.de_json(json.loads(keyboard_json))
@@ -186,7 +206,9 @@ async def leistungspoll_select_date(update: Update, context: LeistungsbotContext
 
         lt_time = datetime.time(19, 0, 0)
 
-        context.user_data["leistungstag"].datetime = datetime.datetime.combine(result, lt_time)
+        context.user_data["leistungstag"].datetime = datetime.datetime.combine(
+            result, lt_time
+        )
 
         # if not self.poller:
         #     self.helper.bot.send_message(
@@ -194,8 +216,11 @@ async def leistungspoll_select_date(update: Update, context: LeistungsbotContext
         #         "Da is wohl was schiefglaufen, i kann ka poll findn...",
         #     )
         #     return
-        if ((context.user_data["leistungstag"].kind == LeistungstagKind.NORMAL or context.user_data["leistungstag"].kind == LeistungstagKind.KONKURENZ) and
-                result.weekday() != calendar.TUESDAY):
+        if (
+            context.user_data["leistungstag"].kind == LeistungstagKind.NORMAL
+            or context.user_data["leistungstag"].kind
+            == LeistungstagKind.KONKURENZ
+        ) and result.weekday() != calendar.TUESDAY:
 
             await context.bot.send_message(
                 update.effective_chat.id,
@@ -209,7 +234,9 @@ async def leistungspoll_select_date(update: Update, context: LeistungsbotContext
     return ConversationHandler.END
 
 
-async def leistungstag_preview(update: Update, context: LeistungsbotContext) -> int:
+async def leistungstag_preview(
+    update: Update, context: LeistungsbotContext
+) -> int:
     if update.effective_chat is None:
         print("No effective chat in leistungpoll", file=sys.stderr)
         return ConversationHandler.END
@@ -221,7 +248,9 @@ async def leistungstag_preview(update: Update, context: LeistungsbotContext) -> 
     lt = context.user_data["leistungstag"]
 
     if lt.datetime is None:
-        await context.bot.send_message(update.effective_chat.id, "Do is ka Datum bei mir onkemma")
+        await context.bot.send_message(
+            update.effective_chat.id, "Do is ka Datum bei mir onkemma"
+        )
         return ConversationHandler.END
 
     date_str = lt.datetime.strftime("%d.%m.%Y %H:%M")
@@ -239,9 +268,13 @@ async def leistungstag_preview(update: Update, context: LeistungsbotContext) -> 
     if type == LeistungsTyp.NORMAL:
         question = f'Leistungstag {count}: am {date_str} in "{location}"'
     elif type == LeistungsTyp.KONKURENZ:
-        question = f'Konkurrenz Leistungstag {count}: am {date_str} in "{location}"'
+        question = (
+            f'Konkurrenz Leistungstag {count}: am {date_str} in "{location}"'
+        )
     elif type == LeistungsTyp.ZUSATZ:
-        question = f'Leistungstag Zusatztermin {count}: am {date_str} in "{location}"'
+        question = (
+            f'Leistungstag Zusatztermin {count}: am {date_str} in "{location}"'
+        )
     else:
         question = "Keine Ahnung wos wia grad polln..."
     poll_message = self.bot.send_poll(
@@ -273,7 +306,9 @@ async def leistungstag_preview(update: Update, context: LeistungsbotContext) -> 
     return ConversationHandler.END
 
 
-async def send_calendar_keyboard(chat_id: int, context: LeistungsbotContext) -> None:
+async def send_calendar_keyboard(
+    chat_id: int, context: LeistungsbotContext
+) -> None:
     calendar, step = DetailedTelegramCalendar(
         min_date=datetime.date.today(),
     ).build()
@@ -302,7 +337,12 @@ def get_next_tuesday() -> datetime.datetime:
 
 def preselect_date_keyboard() -> InlineKeyboardMarkup:
     next_tuesday = get_next_tuesday()
-    options = [InlineKeyboardButton(next_tuesday.strftime("%d.%m.%Y"), callback_data=next_tuesday.isoformat()),
-                InlineKeyboardButton("Ondas Datum", callback_data="*")]
+    options = [
+        InlineKeyboardButton(
+            next_tuesday.strftime("%d.%m.%Y"),
+            callback_data=next_tuesday.isoformat(),
+        ),
+        InlineKeyboardButton("Ondas Datum", callback_data="*"),
+    ]
 
     return InlineKeyboardMarkup.from_column(options)

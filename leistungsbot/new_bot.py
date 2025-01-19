@@ -124,7 +124,9 @@ def start_bot(token: str) -> None:
                 ),
             ],
             ConversationState.LEISTUNGSPOLL_SELECT_DATE: [
-                CallbackQueryHandler(leistungsbot.handlers.polls.leistungspoll_select_date)
+                CallbackQueryHandler(
+                    leistungsbot.handlers.polls.leistungspoll_select_date
+                ),
             ],
             ConversationHandler.TIMEOUT: [
                 MessageHandler(None, timeout),
