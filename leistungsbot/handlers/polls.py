@@ -103,25 +103,44 @@ async def leistungspoll_location(
             reply_to_message_id=update.message.id,
         )
 
-    context.user_data["location"] = Location(
+    context.user_data["leistungstag"].location = Location(
         location_info["key"],
         location_info["name"],
     )
 
     if context.user_data["leistungstag"].kind == LeistungstagKind.ZUSATZ:
-        calendar, step = DetailedTelegramCalendar(
-            min_date=datetime.date.today(),
-        ).build()
-        keyboard = InlineKeyboardMarkup.de_json(json.loads(calendar))
-        await context.bot.send_message(
-            update.effective_chat.id,
-            f"Select {LSTEP[step]}",
-            reply_markup=keyboard,
-        )
+        await send_calendar_keyboard(update.effective_chat.id, context)
         return ConversationState.LEISTUNGSPOLL_SELECT_DATE
     else:
         await context.bot.send_message(update.effective_chat.id, "Für wonn damma pollen?", reply_markup=preselect_date_keyboard())
         return ConversationState.LEISTUNGSPOLL_PRESELECT_DATE
+
+async def leistungpoll_preselect_date(update: Update, context: LeistungsbotContext) -> int:
+    if update.effective_chat is None:
+        print("No effective chat in leistungpoll", file=sys.stderr)
+        return ConversationHandler.END
+
+    if context.user_data is None:
+        print("Userdata is missing", file=sys.stderr)
+        return ConversationHandler.END
+
+    if "leistungstag" not in context.user_data or context.user_data["leistungstag"] is None:
+        print("Leistungstag is missing", file=sys.stderr)
+        return ConversationHandler.END
+
+    if update.callback_query is None or update.callback_query.data is None:
+        await context.bot.send_message(update.effective_chat.id, "Du muast auf de buttons drucken!")
+        return ConversationState.LEISTUNGSPOLL_PRESELECT_DATE
+
+    if update.callback_query.data == "*":
+        await send_calendar_keyboard(update.effective_chat.id, context)
+        return ConversationState.LEISTUNGSPOLL_SELECT_DATE
+
+    else:
+        date = datetime.datetime.fromisoformat(update.callback_query.data)
+        context.user_data["leistungstag"].datetime = date
+        return ConversationState.LEISTUNGSPOLL_PREVIEW
+
 
 async def leistungspoll_select_date(update: Update, context: LeistungsbotContext) -> int:
     if update.effective_chat is None:
@@ -190,11 +209,87 @@ async def leistungspoll_select_date(update: Update, context: LeistungsbotContext
     return ConversationHandler.END
 
 
+async def leistungstag_preview(update: Update, context: LeistungsbotContext) -> int:
+    if update.effective_chat is None:
+        print("No effective chat in leistungpoll", file=sys.stderr)
+        return ConversationHandler.END
+
+    if context.user_data is None:
+        print("Userdata is missing", file=sys.stderr)
+        return ConversationHandler.END
+
+    lt = context.user_data["leistungstag"]
+
+    if lt.datetime is None:
+        await context.bot.send_message(update.effective_chat.id, "Do is ka Datum bei mir onkemma")
+        return ConversationHandler.END
+
+    date_str = lt.datetime.strftime("%d.%m.%Y %H:%M")
+    # close_date = date - timedelta(hours=12)
+    info = self.db.getLocationInfo(location)
+    venue_id = self.bot.send_venue(
+        chat_id,
+        latitude=info["lat"],
+        longitude=info["lng"],
+        title=info["name"],
+        address=info["address"],
+    )
+    count = self.db.getHistoryCount(type)
+    count = count + 1 if count else 1
+    if type == LeistungsTyp.NORMAL:
+        question = f'Leistungstag {count}: am {date_str} in "{location}"'
+    elif type == LeistungsTyp.KONKURENZ:
+        question = f'Konkurrenz Leistungstag {count}: am {date_str} in "{location}"'
+    elif type == LeistungsTyp.ZUSATZ:
+        question = f'Leistungstag Zusatztermin {count}: am {date_str} in "{location}"'
+    else:
+        question = "Keine Ahnung wos wia grad polln..."
+    poll_message = self.bot.send_poll(
+        chat_id,
+        question,
+        ["Bin dabei", "Keine Zeit"],
+        allows_multiple_answers=False,
+        explanation="Soi i da jez a nu erklährn wie ma obstimmt?",
+        is_anonymous=False,
+    )
+    if dry_run:
+        rand_id = self.store_to_rand_file((location, type, date))
+        self.bot.send_message(
+            chat_id,
+            "Woin ma des so veröffentlichen?",
+            reply_markup=self.dry_run_button(rand_id),
+        )
+    else:
+        self.db.addLeistungsTag(
+            date,
+            location,
+            poll_message.message_id,
+            venue_id.message_id,
+            int(type),
+        )
+        self.db.setLocationVisitedState(location, True)
+        self.bot.pin_chat_message(chat_id, poll_message.message_id)
+
+    return ConversationHandler.END
+
+
+async def send_calendar_keyboard(chat_id: int, context: LeistungsbotContext) -> None:
+    calendar, step = DetailedTelegramCalendar(
+        min_date=datetime.date.today(),
+    ).build()
+    keyboard = InlineKeyboardMarkup.de_json(json.loads(calendar))
+    await context.bot.send_message(
+        chat_id,
+        f"Select {LSTEP[step]}",
+        reply_markup=keyboard,
+    )
+
+
 def get_next_tuesday() -> datetime.datetime:
     next_tuesday = datetime.datetime.now() + datetime.timedelta(
         days=(8 - datetime.datetime.now().weekday()) % 8,
     )
-    return datetime(
+    return datetime.datetime(
         next_tuesday.year,
         next_tuesday.month,
         next_tuesday.day,

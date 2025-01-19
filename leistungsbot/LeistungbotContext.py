@@ -26,7 +26,7 @@ class Location:
 @dataclass
 class Leistungstag:
     kind: LeistungstagKind | None = None
-    location_id: int | None = None
+    location: Location | None = None
     datetime: datetime | None = None
 
 
