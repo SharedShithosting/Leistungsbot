@@ -21,6 +21,9 @@ class LeistungstagKind(IntEnum):
 class Location:
     id: int | None = None
     name: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    address: str | None = None
 
 
 @dataclass
@@ -39,7 +42,5 @@ class BotContext(TypedDict):
     oldlb: LeistungsBot
 
 
-class LeistungsbotContext(
-    CallbackContext[ExtBot, UserContext, dict, BotContext],
-):
+class LeistungsbotContext(CallbackContext[ExtBot, UserContext, dict, BotContext]):
     pass

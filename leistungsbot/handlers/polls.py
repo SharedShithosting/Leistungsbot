@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import calendar
 import datetime
+from enum import IntEnum, auto
 import json
 import sys
 import time
@@ -10,7 +11,7 @@ from telegram import InlineKeyboardButton
 from telegram import InlineKeyboardMarkup
 from telegram import ReplyKeyboardMarkup
 from telegram import Update
-from telegram.ext import ConversationHandler
+from telegram.ext import ConversationHandler, ExtBot
 from telegram_bot_calendar import DetailedTelegramCalendar
 from telegram_bot_calendar import LSTEP
 
@@ -20,6 +21,12 @@ from leistungsbot.LeistungbotContext import LeistungsbotContext
 from leistungsbot.LeistungbotContext import Leistungstag
 from leistungsbot.LeistungbotContext import LeistungstagKind
 from leistungsbot.LeistungbotContext import Location
+
+
+class IntermediateResult(IntEnum):
+    CONTINUE = auto()
+    SAME_STATE = auto()
+    ABORT = auto()
 
 
 async def leistungspoll(update: Update, context: LeistungsbotContext) -> int:
@@ -122,8 +129,7 @@ async def leistungspoll_location(
 
 
 async def leistungpoll_preselect_date(
-    update: Update, context: LeistungsbotContext
-) -> int:
+        update: Update, context: LeistungsbotContext) -> int:
     if update.effective_chat is None:
         print("No effective chat in leistungpoll", file=sys.stderr)
         return ConversationHandler.END
@@ -132,10 +138,8 @@ async def leistungpoll_preselect_date(
         print("Userdata is missing", file=sys.stderr)
         return ConversationHandler.END
 
-    if (
-        "leistungstag" not in context.user_data
-        or context.user_data["leistungstag"] is None
-    ):
+    if ("leistungstag" not in context.user_data
+            or context.user_data["leistungstag"] is None):
         print("Leistungstag is missing", file=sys.stderr)
         return ConversationHandler.END
 
@@ -210,12 +214,6 @@ async def leistungspoll_select_date(
             result, lt_time
         )
 
-        # if not self.poller:
-        #     self.helper.bot.send_message(
-        #         call.message.chat_id,
-        #         "Da is wohl was schiefglaufen, i kann ka poll findn...",
-        #     )
-        #     return
         if (
             context.user_data["leistungstag"].kind == LeistungstagKind.NORMAL
             or context.user_data["leistungstag"].kind
@@ -227,6 +225,9 @@ async def leistungspoll_select_date(
                 "Blasphemie, des is ka Dienstag wast da du do ausgsuacht hast...alles auf eigene Gefahr!",
             )
             time.sleep(1)
+
+        await send_leistungstag(context.bot, update.effective_chat.id, context.user_data["leistungstag"])
+        # TODO: Send preview question
 
         return ConversationState.LEISTUNGSPOLL_PREVIEW
 
@@ -246,45 +247,14 @@ async def leistungstag_preview(
         return ConversationHandler.END
 
     lt = context.user_data["leistungstag"]
+    location = lt.location
 
-    if lt.datetime is None:
+    if lt.datetime is None or location is None:
         await context.bot.send_message(
-            update.effective_chat.id, "Do is ka Datum bei mir onkemma"
+            update.effective_chat.id, "Hiaz hods ma in context zaumkhaut"
         )
         return ConversationHandler.END
 
-    date_str = lt.datetime.strftime("%d.%m.%Y %H:%M")
-    # close_date = date - timedelta(hours=12)
-    info = self.db.getLocationInfo(location)
-    venue_id = self.bot.send_venue(
-        chat_id,
-        latitude=info["lat"],
-        longitude=info["lng"],
-        title=info["name"],
-        address=info["address"],
-    )
-    count = self.db.getHistoryCount(type)
-    count = count + 1 if count else 1
-    if type == LeistungsTyp.NORMAL:
-        question = f'Leistungstag {count}: am {date_str} in "{location}"'
-    elif type == LeistungsTyp.KONKURENZ:
-        question = (
-            f'Konkurrenz Leistungstag {count}: am {date_str} in "{location}"'
-        )
-    elif type == LeistungsTyp.ZUSATZ:
-        question = (
-            f'Leistungstag Zusatztermin {count}: am {date_str} in "{location}"'
-        )
-    else:
-        question = "Keine Ahnung wos wia grad polln..."
-    poll_message = self.bot.send_poll(
-        chat_id,
-        question,
-        ["Bin dabei", "Keine Zeit"],
-        allows_multiple_answers=False,
-        explanation="Soi i da jez a nu erklährn wie ma obstimmt?",
-        is_anonymous=False,
-    )
     if dry_run:
         rand_id = self.store_to_rand_file((location, type, date))
         self.bot.send_message(
@@ -307,18 +277,56 @@ async def leistungstag_preview(
 
 
 async def send_calendar_keyboard(
-    chat_id: int, context: LeistungsbotContext
+     bot: ExtBot, chat_id: int
 ) -> None:
     calendar, step = DetailedTelegramCalendar(
         min_date=datetime.date.today(),
     ).build()
     keyboard = InlineKeyboardMarkup.de_json(json.loads(calendar))
-    await context.bot.send_message(
+    await bot.send_message(
         chat_id,
         f"Select {LSTEP[step]}",
         reply_markup=keyboard,
     )
 
+async def send_leistungstag(bot: ExtBot, chat_id: int, lt: Leistungstag) -> IntermediateResult:
+    if lt.datetime is None or lt.location is None:
+        await bot.send_message(chat_id, "Do hob i hiaz in context verloren")
+        return IntermediateResult.ABORT
+
+    location = lt.location
+
+    date_str = lt.datetime.strftime("%d.%m.%Y %H:%M")
+    venue_id = bot.send_venue(
+        chat_id,
+        latitude=location.latitude,
+        longitude=location.longitude,
+        title=location.name,
+        address=location.address,
+    )
+
+    count = 1 # TODO
+
+    match lt.kind:
+        case LeistungstagKind.NORMAL:
+            kind_phrase = "Leistungstag"
+        case LeistungstagKind.KONKURENZ:
+            kind_phrase = "Konkurenz Leistungstag"
+        case LeistungstagKind.ZUSATZ:
+            kind_phrase = "Leistungstag Zusatztermin"
+
+    poll_title = f'{kind_phrase} {count}: am {date_str} in "{location}"'
+
+    poll_message = bot.send_poll(
+        chat_id,
+        poll_title,
+        ["Bin dabei", "Keine Zeit"],
+        allows_multiple_answers=False,
+        explanation="Soi i da jez a nu erklährn wie ma obstimmt?",
+        is_anonymous=False,
+    )
+
+    return IntermediateResult.CONTINUE
 
 def get_next_tuesday() -> datetime.datetime:
     next_tuesday = datetime.datetime.now() + datetime.timedelta(
@@ -346,3 +354,4 @@ def preselect_date_keyboard() -> InlineKeyboardMarkup:
     ]
 
     return InlineKeyboardMarkup.from_column(options)
+
