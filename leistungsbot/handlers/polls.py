@@ -255,25 +255,27 @@ async def leistungstag_preview(
         )
         return ConversationHandler.END
 
-    if dry_run:
-        rand_id = self.store_to_rand_file((location, type, date))
-        self.bot.send_message(
-            chat_id,
-            "Woin ma des so veröffentlichen?",
-            reply_markup=self.dry_run_button(rand_id),
-        )
-    else:
-        self.db.addLeistungsTag(
-            date,
-            location,
-            poll_message.message_id,
-            venue_id.message_id,
-            int(type),
-        )
-        self.db.setLocationVisitedState(location, True)
-        self.bot.pin_chat_message(chat_id, poll_message.message_id)
+    await send_leistungstag(context.bot, update.effective_chat.id, lt)
+
+    self.bot.send_message(
+        chat_id,
+        "Woin ma des so veröffentlichen?",
+        reply_markup=self.dry_run_button(rand_id),
+    )
 
     return ConversationHandler.END
+
+
+async def leistungstag_send_serious(update: Update, context: LeistungsbotContext) -> int:
+    self.db.addLeistungsTag(
+        date,
+        location,
+        poll_message.message_id,
+        venue_id.message_id,
+        int(type),
+    )
+    self.db.setLocationVisitedState(location, True)
+    self.bot.pin_chat_message(chat_id, poll_message.message_id)
 
 
 async def send_calendar_keyboard(
@@ -354,4 +356,3 @@ def preselect_date_keyboard() -> InlineKeyboardMarkup:
     ]
 
     return InlineKeyboardMarkup.from_column(options)
-
