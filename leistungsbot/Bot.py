@@ -711,6 +711,8 @@ class LeistungsBot:
                     f"An error occurred!\nError: {error}",
                 )
 
+        self.send_nudes = send_nudes
+
         @bot.message_handler(commands=["add_location"])
         def add_location(message):
             try:

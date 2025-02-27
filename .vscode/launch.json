@@ -18,6 +18,18 @@
             ]
         },
         {
+            "name": "Python: new_bot.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/leistungsbot/new_bot.py",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "env": {
+                "LEISTUNGSBOT_CONFIG_FILE": "BotConfig.yml"
+            },
+            "justMyCode": true
+        },
+        {
             "name": "Python: Aktuelle Datei",
             "type": "python",
             "request": "launch",
