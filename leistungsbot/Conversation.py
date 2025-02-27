@@ -11,3 +11,4 @@ class ConversationState(IntEnum):
     LEISTUNGSPOLL_PRESELECT_DATE = auto()
     LEISTUNGSPOLL_SELECT_DATE = auto()
     LEISTUNGSPOLL_PREVIEW = auto()
+    LEISTUNGSPOLL_PUBLISH = auto()

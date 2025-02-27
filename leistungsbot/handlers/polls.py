@@ -257,13 +257,13 @@ async def leistungstag_preview(
 
     await send_leistungstag(context.bot, update.effective_chat.id, lt)
 
-    self.bot.send_message(
-        chat_id,
+    await context.bot.send_message(
+        update.effective_chat.id,
         "Woin ma des so veröffentlichen?",
-        reply_markup=self.dry_run_button(rand_id),
+        reply_markup=leistungstag_preview_keyboard(),
     )
 
-    return ConversationHandler.END
+    return ConversationState.LEISTUNGSPOLL_PUBLISH
 
 
 async def leistungstag_send_serious(update: Update, context: LeistungsbotContext) -> int:
@@ -353,6 +353,15 @@ def preselect_date_keyboard() -> InlineKeyboardMarkup:
             callback_data=next_tuesday.isoformat(),
         ),
         InlineKeyboardButton("Ondas Datum", callback_data="*"),
+    ]
+
+    return InlineKeyboardMarkup.from_column(options)
+
+
+def leistungstag_preview_keyboard() -> InlineKeyboardMarkup:
+    options = [
+        InlineKeyboardButton("Na", callback_data="cancel"),
+        InlineKeyboardButton("Passt so", callback_data="publish")
     ]
 
     return InlineKeyboardMarkup.from_column(options)
