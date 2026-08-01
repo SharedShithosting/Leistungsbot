@@ -1056,6 +1056,7 @@ class LeistungsBot:
                     message.chat.id,
                     "Host du in da Voikschui ned aufpasst wos a nummer is? Probiers numoi ...",
                 )
+                return
 
             lt = self.helper.db.getLeistungstagByNumber(lt_number)
             if lt is None:
@@ -1134,13 +1135,14 @@ class LeistungsBot:
             self.user_context[message.from_user.id]["leistungstag"] = None
             # TODO: Edit poll message, if possible
 
-        @bot.message_handler(commands="switcheroo")
+        @bot.message_handler(commands=["switcheroo"])
         def switcheroo(message: telebot.types.Message) -> None:
             if not self.helper.sender_has_permission(message):
                 self.bot.reply_to(
                     message,
                     "Diese Funktion ist nicht für den Pöbel gedacht.",
                 )
+                return
 
             self.bot.send_message(
                 message.chat.id,

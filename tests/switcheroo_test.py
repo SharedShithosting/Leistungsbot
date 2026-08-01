@@ -10,8 +10,6 @@
 """
 from __future__ import annotations
 
-import pytest
-
 from tests import support
 from tests.fixtures import LOCATION_A
 from tests.fixtures import LOCATION_B
@@ -32,19 +30,11 @@ def test_asks_for_the_number(app):
     )
 
 
-def test_pleb_is_told_off(pleb):
+def test_pleb_is_rejected(pleb):
     support.send_command(pleb, "/switcheroo")
 
     support.assert_said(pleb, "nicht für den Pöbel")
-
-
-@pytest.mark.xfail(
-    reason="known bug: the permission check has no return, the command continues",
-    strict=True,
-)
-def test_pleb_is_actually_stopped(pleb):
-    support.send_command(pleb, "/switcheroo")
-
+    support.assert_not_said(pleb, "Wechan muastn ändern?")
     assert support.state_of(pleb) is None
 
 
@@ -73,14 +63,12 @@ def test_unknown_number_stops_the_workflow(app, db):
     support.assert_not_said(app, "Wo schau ma stottdessen hin?")
 
 
-@pytest.mark.xfail(
-    reason="known bug: no return after the complaint, the handler then crashes",
-    strict=True,
-)
-def test_a_word_is_not_a_number(app):
+def test_a_word_is_not_a_number(app, db):
     pick_leistungstag(app, "sieben")
 
+    support.assert_no_dev_error(app)
     support.assert_said(app, "Host du in da Voikschui ned aufpasst")
+    db.getLeistungstagByNumber.assert_not_called()
     assert (
         support.state_of(app) == "LeistungsState:switcherooLeistungstagNumber"
     )
