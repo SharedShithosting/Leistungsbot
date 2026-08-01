@@ -27,4 +27,26 @@ jobs:
           virtualenvs-create: true
           virtualenvs-in-project: true
       - run: poetry install --no-interaction --with=dev
-      - run: poetry run pytest tests/ -v --junitxml=reports/junit/junit.xml
+      - name: Run tests with coverage
+        run: poetry run coverage run -m pytest tests/ -v --junitxml=reports/junit/junit.xml
+      - name: Coverage report
+        run: |
+          poetry run coverage report
+          poetry run coverage xml -o reports/coverage/coverage.xml
+          poetry run coverage html -d reports/coverage
+      - name: Coverage summary
+        if: always()
+        run: |
+          {
+            echo "### Coverage (python ${{ matrix.python-version }})"
+            echo
+            echo '```'
+            poetry run coverage report
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Archive reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-${{ matrix.python-version }}
+          path: reports

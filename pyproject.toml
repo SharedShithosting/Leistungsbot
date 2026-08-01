@@ -45,3 +45,17 @@ build-backend = "poetry_dynamic_versioning.backend"
 
 [tool.mypy]
 disallow_untyped_defs = true
+
+
+[tool.coverage.run]
+source = ["leistungsbot"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_also = [
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+  "raise NotImplementedError",
+]
