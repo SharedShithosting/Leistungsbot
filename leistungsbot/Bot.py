@@ -59,6 +59,10 @@ User Available Commands:
     15. /konkurrenzpoll
     16. /version
 
+Admin Commands: #NOTE: only administrators of the leistungschat
+ are allowed for these commands:
+    1. /backup
+
 Developer Commands: #NOTE: ONLY @eckphi is
  allowed for these comands:
     1. /showIds
@@ -723,6 +727,29 @@ class LeistungsBot:
                     message.chat.id,
                     "Schick dei location idee muaz",
                 )
+            except Exception as error:
+                bot.send_message(
+                    lc.config["chat_id"],
+                    f"Hi Devs!!\nHandle This Error plox\n{error}",
+                )
+                bot.reply_to(message, f"An error occurred!\nError: {error}")
+                bot.send_message(
+                    lc.config["chat_id"],
+                    f"An error occurred!\nError: {error}",
+                )
+
+        @bot.message_handler(commands=["backup"])
+        def backup(message):
+            try:
+                if not self.helper.sender_has_permission(message):
+                    self.bot.reply_to(
+                        message,
+                        "Diese Funktion ist nicht für den Pöbel gedacht.",
+                    )
+                    return
+
+                self.bot.reply_to(message, "I grab da de Datenbank zaum ...")
+                self.helper.send_backup(message.chat.id)
             except Exception as error:
                 bot.send_message(
                     lc.config["chat_id"],

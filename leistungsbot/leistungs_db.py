@@ -10,9 +10,13 @@ import logging
 import re
 from datetime import date
 from datetime import datetime
+from datetime import time
+from datetime import timedelta
+from decimal import Decimal
 from enum import Enum
 
 import mysql.connector
+from mysql.connector.conversion import MySQLConverter
 
 from leistungsbot import leistungs_config as lc
 from leistungsbot.google_place import Places
@@ -28,6 +32,7 @@ class LeistungsTagState(Enum):
 class LeistungsDB:
     def __init__(self):
         self.google = Places()
+        self.converter = MySQLConverter()
         self.connect()
 
     def connect(self):
@@ -686,6 +691,108 @@ class LeistungsDB:
         sql = "SELECT * FROM `leistungs_view` WHERE number = %s"
         cursor.execute(sql, (number,))
         return self.convert(cursor.fetchone(), True)
+
+    def getTables(self) -> tuple[list[str], list[str]]:
+        """! Names of everything in the current database
+
+        @returns Base table names and view names, each sorted by name
+        """
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
+        cursor = self.mydb.cursor()
+        sql = "SHOW FULL TABLES;"
+        logging.debug(sql)
+        cursor.execute(sql)
+        tables = []
+        views = []
+        for name, table_type in cursor.fetchall():
+            if table_type == "VIEW":
+                views.append(name)
+            else:
+                tables.append(name)
+        return sorted(tables), sorted(views)
+
+    def sqlLiteral(self, value) -> str:
+        """! Renders a python value as a SQL literal for the dump"""
+        if value is None:
+            return "NULL"
+        if isinstance(value, bool):
+            return "1" if value else "0"
+        if isinstance(value, (int, float, Decimal)):
+            return str(value)
+        if isinstance(value, (bytes, bytearray)):
+            # `bit` columns arrive as bytes, a hex literal round trips them
+            return f"0x{bytes(value).hex()}" if value else "''"
+        if isinstance(value, timedelta):
+            return f"'{value}'"
+        if isinstance(value, datetime):
+            return f"'{value.isoformat(sep=' ')}'"
+        if isinstance(value, (date, time)):
+            return f"'{value.isoformat()}'"
+        return f"'{self.converter.escape(str(value))}'"
+
+    def dump(self) -> str:
+        """! Dumps the whole database as SQL
+
+        Structure and contents of every base table plus the definition of
+        every view, in an order that can be replayed into an empty database.
+
+        @returns The dump as a single SQL script
+        """
+        if not self.mydb.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+
+        tables, views = self.getTables()
+        # buffered, because the `SHOW CREATE ...` result sets are read with
+        # fetchone and the connection would otherwise refuse the next query
+        cursor = self.mydb.cursor(buffered=True)
+
+        lines = [
+            "-- LeistungsBot database dump",
+            f"-- created {datetime.now().isoformat(timespec='seconds')}",
+            "",
+            "SET NAMES utf8mb4;",
+            "SET FOREIGN_KEY_CHECKS = 0;",
+            "",
+        ]
+
+        for table in tables:
+            cursor.execute(f"SHOW CREATE TABLE `{table}`;")
+            create = cursor.fetchone()[1]
+            lines += [
+                f"DROP TABLE IF EXISTS `{table}`;",
+                f"{create};",
+                "",
+            ]
+
+            cursor.execute(f"SELECT * FROM `{table}`;")
+            rows = cursor.fetchall()
+            if not rows:
+                continue
+            columns = ", ".join(f"`{c[0]}`" for c in cursor.description)
+            for row in rows:
+                values = ", ".join(self.sqlLiteral(v) for v in row)
+                lines.append(
+                    f"INSERT INTO `{table}` ({columns}) VALUES ({values});",
+                )
+            lines.append("")
+
+        for view in views:
+            cursor.execute(f"SHOW CREATE VIEW `{view}`;")
+            create = cursor.fetchone()[1]
+            lines += [
+                f"DROP VIEW IF EXISTS `{view}`;",
+                f"{create};",
+                "",
+            ]
+
+        lines += ["SET FOREIGN_KEY_CHECKS = 1;", ""]
+        return "\n".join(lines)
 
     def switchLeistungstagLocation(
         self,
