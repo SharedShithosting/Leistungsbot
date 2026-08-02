@@ -5,5 +5,33 @@ services:
     volumes:
       - ./BotConfig.yml:/config/BotConfig.yml:ro
       - leistungsdata:/data
+  # What phpMyAdmin used to be, now that the database is a file.
+  #
+  #   docker compose --profile dev up
+  #   https://localhost:3001   (3000 is plain http and has to be proxied)
+  #
+  # Only in the `dev` profile, so a plain `docker compose up` does not start
+  # it. Bound to 127.0.0.1 on purpose: the image ships a whole desktop with a
+  # terminal that has passwordless sudo, so whoever reaches this port owns the
+  # container. Do not publish it.
+  sqlitebrowser:
+    image: lscr.io/linuxserver/sqlitebrowser:latest
+    profiles: ["dev"]
+    restart: unless-stopped
+    environment:
+      # root, because the bot container writes the database as root and the
+      # browser has to be able to open it read-write
+      - PUID=0
+      - PGID=0
+      - TZ=Europe/Vienna
+    volumes:
+      - sqlitebrowserconfig:/config
+      # the database shows up as /data/leistungs_db.sqlite
+      - leistungsdata:/data
+    ports:
+      - 127.0.0.1:3000:3000
+      - 127.0.0.1:3001:3001
+    shm_size: "1gb"
 volumes:
   leistungsdata:
+  sqlitebrowserconfig:
