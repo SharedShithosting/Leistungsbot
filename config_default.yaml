@@ -10,3 +10,10 @@ leistungsadmin_id: "your-leistungsadmin-id"
 usernames:
   - "your-username"
 backupchat_id: "your-backup-channel-id"
+
+# Optional. Without this section no calendar is kept.
+# calendar:
+#   provider: "google"
+#   calendar_id: "your-calendar-id@group.calendar.google.com"
+#   credentials: "/data/google-service-account.json"
+#   timezone: "Europe/Vienna"

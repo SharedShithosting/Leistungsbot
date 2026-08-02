@@ -25,6 +25,42 @@ To look inside it, `docker compose --profile dev up` starts a SQLite
 browser on <https://localhost:3001>.
 
 
+## Calendar
+
+The bot can keep a calendar in step with the leistungstage: publishing one
+creates an entry, closing the poll or moving it to another location updates
+that entry, and purging it takes the entry away again. It hangs off the
+database rather than off the commands, so the scheduler closing a poll on
+its own counts too.
+
+At every start the bot also walks the whole `leistungstag` table into the
+calendar, oldest first and in a background thread. That is what gets the
+leistungstage that predate the calendar in there, and it is safe to
+repeat - an entry is identified by the leistungstag it belongs to, so it
+is written over rather than duplicated.
+
+Off unless configured, which is the `calendar` section:
+
+```yaml
+calendar:
+  provider: "google"
+  calendar_id: "abc123@group.calendar.google.com"
+  credentials: "/data/google-service-account.json"
+  timezone: "Europe/Vienna"
+```
+
+`credentials` is the json key of a google [service account] - a bot has
+nobody to click through a consent screen. The service account cannot make a
+calendar for itself, so make one and share it with the account's email
+address as "make changes to events".
+
+Google is the only provider so far. `leistungsbot/leistungs_calendar.py` is
+the part that does not know that: a second one is a `Calendar` subclass and
+a line in `from_config`.
+
+[service account]: https://cloud.google.com/iam/docs/service-account-overview
+
+
 ## Intro
   <body>This Is A Simple Bot To Create Poll In Channel and Groups <br> And Also This Is our First Project Too..
 
