@@ -49,6 +49,11 @@ calendar:
   timezone: "Europe/Vienna"
 ```
 
+`timezone` may be left out, in which case the container's `TZ` decides and
+`Europe/Vienna` is the last word. Times go into the calendar as wall clock
+plus that zone, so a leistungstag stays at seven in the evening across a
+daylight saving change.
+
 `credentials` is the json key of a google [service account] - a bot has
 nobody to click through a consent screen. The service account cannot make a
 calendar for itself, so make one and share it with the account's email

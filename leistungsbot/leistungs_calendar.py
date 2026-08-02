@@ -23,6 +23,7 @@ look like.
 from __future__ import annotations
 
 import logging
+import os
 from abc import ABC
 from abc import abstractmethod
 from dataclasses import dataclass
@@ -52,6 +53,15 @@ TITLES = {
 
 DEFAULT_TITLE = "Leistungstag"
 DEFAULT_TIMEZONE = "Europe/Vienna"
+
+
+def default_timezone() -> str:
+    """! The zone to put on an event when the configuration names none
+
+    `TZ` first: a container is told what its local time is, and that is the
+    zone the group meets in. Falls back to where the group actually meets.
+    """
+    return os.environ.get("TZ") or DEFAULT_TIMEZONE
 
 
 def event_uid(leistungstag_key: int) -> str:
@@ -127,7 +137,7 @@ class CalendarSync:
     def __init__(self, calendar: Calendar, db, timezone: str = None) -> None:
         self.calendar = calendar
         self.db = db
-        self.timezone = timezone or DEFAULT_TIMEZONE
+        self.timezone = timezone or default_timezone()
 
     def on_change(self, change: Change, leistungstag: dict) -> None:
         """! Reacts to one write to the `leistungstag` table
@@ -228,8 +238,14 @@ def from_config(db) -> CalendarSync | None:
         return None
 
     calendar_id = settings.get("calendar_id")
+    credentials = settings.get("credentials")
     if not calendar_id:
-        logging.warning("calendar: no calendar_id configured, not syncing")
+        # an empty section is how a deployment says "no calendar, thanks":
+        # runtipi hands every field it knows to the container, the ones
+        # that were left blank included. Only complain when the rest of the
+        # section says somebody meant to configure one.
+        if credentials:
+            logging.warning("calendar: no calendar_id configured, not syncing")
         return None
 
     provider = (settings.get("provider") or "google").lower()
@@ -242,7 +258,7 @@ def from_config(db) -> CalendarSync | None:
     from leistungsbot.google_calendar import GoogleCalendar
 
     try:
-        calendar = GoogleCalendar(calendar_id, settings.get("credentials"))
+        calendar = GoogleCalendar(calendar_id, credentials)
     except Exception:
         logging.exception("calendar: could not reach the calendar backend")
         return None

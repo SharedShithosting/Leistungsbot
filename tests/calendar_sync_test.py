@@ -327,10 +327,32 @@ def test_the_entry_carries_the_configured_timezone(db, calendar):
     assert calendar.events[event_uid(key)].timezone == "Europe/Berlin"
 
 
-def test_the_timezone_falls_back_to_vienna(db, calendar):
-    sync = CalendarSync(calendar, db)
+def test_the_timezone_falls_back_to_the_containers(db, calendar, monkeypatch):
+    """`TZ` is what the app was told its local time is."""
+    monkeypatch.setenv("TZ", "Europe/Berlin")
 
-    assert sync.timezone == "Europe/Vienna"
+    assert CalendarSync(calendar, db).timezone == "Europe/Berlin"
+
+
+def test_a_configured_timezone_beats_the_containers(db, calendar, monkeypatch):
+    monkeypatch.setenv("TZ", "Europe/Berlin")
+
+    assert CalendarSync(calendar, db, "Europe/Vienna").timezone == (
+        "Europe/Vienna"
+    )
+
+
+def test_the_timezone_falls_back_to_vienna(db, calendar, monkeypatch):
+    monkeypatch.delenv("TZ", raising=False)
+
+    assert CalendarSync(calendar, db).timezone == "Europe/Vienna"
+
+
+def test_an_empty_timezone_is_no_timezone(db, calendar, monkeypatch):
+    """runtipi hands over the fields that were left blank as well."""
+    monkeypatch.delenv("TZ", raising=False)
+
+    assert CalendarSync(calendar, db, "").timezone == "Europe/Vienna"
 
 
 @pytest.mark.parametrize(
@@ -430,6 +452,41 @@ def test_a_section_without_a_calendar_id_is_refused(db, monkeypatch):
     )
 
     assert leistungs_calendar.from_config(db) is None
+
+
+def test_a_section_of_empty_fields_is_not_complained_about(db, monkeypatch):
+    """runtipi passes every field it knows, blank ones included - that is a
+    deployment saying it does not want a calendar, not a broken one."""
+    monkeypatch.setitem(
+        __import__(
+            "leistungsbot.leistungs_config",
+            fromlist=["config"],
+        ).config,
+        "calendar",
+        {"provider": "google", "calendar_id": "", "credentials": ""},
+    )
+    warned = MagicMock()
+    monkeypatch.setattr("logging.warning", warned)
+
+    assert leistungs_calendar.from_config(db) is None
+    warned.assert_not_called()
+
+
+def test_a_key_without_a_calendar_id_is_complained_about(db, monkeypatch):
+    """Half a section is somebody who meant to configure one."""
+    monkeypatch.setitem(
+        __import__(
+            "leistungsbot.leistungs_config",
+            fromlist=["config"],
+        ).config,
+        "calendar",
+        {"calendar_id": "", "credentials": "/config/key.json"},
+    )
+    warned = MagicMock()
+    monkeypatch.setattr("logging.warning", warned)
+
+    assert leistungs_calendar.from_config(db) is None
+    warned.assert_called_once()
 
 
 def test_an_unknown_provider_is_refused(db, monkeypatch):
