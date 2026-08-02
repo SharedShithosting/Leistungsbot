@@ -42,6 +42,9 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 COPY --from=builder ${VIRTUAL_ENV} ${VIRTUAL_ENV}
 
-ENV LEISTUNGSBOT_CONFIG_FILE "/config/BotConfig.yml"
+ENV LEISTUNGSBOT_CONFIG_FILE="/config/BotConfig.yml"
+# the database is a file now, keep it on a volume
+ENV LEISTUNGSBOT_SQLITE__PATH="/data/leistungs_db.sqlite"
+VOLUME /data
 
 CMD [ "python", "-m", "leistungsbot" ]

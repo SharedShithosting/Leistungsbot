@@ -114,7 +114,7 @@ def test_migrated_chat_id_only_fires_for_migrations(app):
 
 def test_a_failing_command_reports_once(app, db):
     """End to end: the /backup handler routes through the reporter."""
-    db.dump.side_effect = RuntimeError("no connection to the database")
+    db.snapshot.side_effect = RuntimeError("no connection to the database")
 
     support.send_command(app, "/backup")
 

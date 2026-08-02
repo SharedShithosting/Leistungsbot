@@ -20,6 +20,7 @@ the in-memory state storage and are what the multi step commands are built on.
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import DEFAULT
 from unittest.mock import MagicMock
 
@@ -52,6 +53,8 @@ _API_METHODS = {
     "get_chat_member",
     "get_me",
 }
+
+SNAPSHOT = b"SQLite format 3\x00-- test snapshot"
 
 POLL_MESSAGE_ID = 555
 VENUE_MESSAGE_ID = 554
@@ -157,6 +160,12 @@ def db() -> MagicMock:
     db.getLeistungstagByNumber.side_effect = lambda number: make_leistungstag(
         key=number + 100,
     )
+
+    def snapshot(target):
+        Path(target).write_bytes(SNAPSHOT)
+        return Path(target)
+
+    db.snapshot.side_effect = snapshot
     db.addLocation.return_value = None
     return db
 

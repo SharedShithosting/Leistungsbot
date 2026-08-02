@@ -4,13 +4,17 @@ import argparse
 import os
 
 import confuse
+import platformdirs
 
 template = {
-    "mysql": {
-        "host": confuse.Optional(str),
-        "db": confuse.Optional(str),
-        "user": confuse.Optional(str),
-        "password": confuse.Optional(str),
+    "sqlite": {
+        "path": confuse.Optional(
+            str,
+            default=str(
+                platformdirs.user_data_path("LeistungsBot")
+                / "leistungs_db.sqlite",
+            ),
+        ),
     },
     "google": str,
     "bot_token": str,
@@ -19,6 +23,7 @@ template = {
     "chat_id": [int, str],
     "leistungschat_id": [int, str],
     "leistungsadmin_id": [int, str],
+    "backupchat_id": confuse.Optional([int, str]),
     "usernames": confuse.StrSeq(),
 }
 
@@ -57,4 +62,4 @@ def __getitem__(self, key):
 
 
 if __name__ == "__main__":
-    assert config["mysql"]["user"] == "leistungs_user"
+    print(config["sqlite"]["path"])

@@ -6,6 +6,7 @@
 # #############################################################################
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from datetime import datetime
@@ -16,18 +17,20 @@ import telebot
 
 from leistungsbot import leistungs_config as lc
 from leistungsbot.BotHelper import LeistungsTyp
-from leistungsbot.leistungs_db import LeistungsDB
 from leistungsbot.leistungs_db import LeistungsTagState
 
 
 class Scheduler:
-    def __init__(self, bot: telebot.TeleBot) -> None:
+    def __init__(self, bot: telebot.TeleBot, helper) -> None:
         self.bot = bot
-        self.db = LeistungsDB()
+        self.helper = helper
+        # the helper already holds an open database, no second one needed
+        self.db = helper.db
         self.schedule = schedule
         self.schedule.every().day.at("12:00").do(self.send_reminder)
         self.schedule.every().monday.at("12:00").do(self.send_reservation)
         self.schedule.every().day.at("19:00").do(self.close_previous)
+        self.schedule.every().sunday.at("04:00").do(self.send_backup)
         self.start()
 
     def run_continuously(self, interval=1):
@@ -93,7 +96,7 @@ class Scheduler:
         previous = self.db.getLeistungsTags(
             type,
             LeistungsTagState.OPEN,
-            before=datetime().now(),
+            before=datetime.now(),
         )
         for prev in previous:
             location = self.db.getLocationName(prev["location"])
@@ -101,7 +104,7 @@ class Scheduler:
                 lc.config["leistungsadmin_id"],
                 f"Schaut so aus ois ob do a alter Leistungstag nuned geclosed worden is...I schlias {location} fia eich.",
             )
-            self.helper.db.closeLeistungstag(prev["key"])
+            self.db.closeLeistungstag(prev["key"])
             self.bot.stop_poll(
                 lc.config["leistungschat_id"],
                 prev["poll_id"],
@@ -109,5 +112,20 @@ class Scheduler:
 
 
 if __name__ == "__main__":
-    s = Scheduler(telebot.TeleBot(lc.config["bot_token"]))
+    from leistungsbot.BotHelper import Helper
+
+    bot = telebot.TeleBot(lc.config["bot_token"])
+    s = Scheduler(bot, Helper(bot))
     s.start()
+
+    def send_backup(self) -> None:
+        """! Posts a copy of the database into the backup chat
+
+        Does nothing when no `backupchat_id` is configured, so an existing
+        deployment does not start posting its database somewhere by accident.
+        """
+        chat_id = lc.config.get("backupchat_id")
+        if not chat_id:
+            logging.debug("no backupchat_id configured, skipping the backup")
+            return
+        self.helper.send_backup(chat_id)

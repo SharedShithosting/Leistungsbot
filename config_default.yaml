@@ -1,8 +1,5 @@
-mysql:
-  host: '0.0.0.0'
-  db: 'leistungs_db'
-  user: 'leistungs_user'
-  password: 'RealyStrongPassword'
+sqlite:
+  path: "/data/leistungs_db.sqlite"
 google: "YOUR_API_KEY"
 bot_token: "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
 api_hash: "your-api-hash"
@@ -12,3 +9,4 @@ leistungschat_id: "your-leistungschat-id"
 leistungsadmin_id: "your-leistungsadmin-id"
 usernames:
   - "your-username"
+backupchat_id: "your-backup-channel-id"
