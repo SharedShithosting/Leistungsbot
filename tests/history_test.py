@@ -6,8 +6,9 @@
 # #############################################################################
 """/history - browse past leistungstage.
 
-    /history -> 🍻history_type (typ) -> 🍻history (leistungstag) -> info card
+/history -> 🍻history_type (typ) -> 🍻history (leistungstag) -> info card
 """
+
 from __future__ import annotations
 
 import pytest

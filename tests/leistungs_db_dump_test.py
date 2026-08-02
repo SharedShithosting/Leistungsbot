@@ -10,6 +10,7 @@ The connection is faked instead of mocked: the stub answers the handful of
 queries a dump makes, so the assertions are about the generated SQL and not
 about which methods were called.
 """
+
 from __future__ import annotations
 
 from datetime import date

@@ -22,7 +22,6 @@ from leistungsbot import leistungs_config as lc
 from leistungsbot.google_place import Places
 from leistungsbot.leistungs_returns import LeistungsReturnCodes
 
-
 # Written into a dump that could not be produced in full, and checked for by
 # the code that hands the dump to the user.
 DUMP_INCOMPLETE = "-- WARNING: this dump is incomplete"

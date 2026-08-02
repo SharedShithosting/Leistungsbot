@@ -6,8 +6,9 @@
 # #############################################################################
 """/add_location - google search, pick a candidate, confirm, store.
 
-    /add_location -> query -> 🍻search (pick) -> 🍻select (confirm) -> db
+/add_location -> query -> 🍻search (pick) -> 🍻select (confirm) -> db
 """
+
 from __future__ import annotations
 
 from leistungsbot.leistungs_returns import LeistungsReturnCodes
