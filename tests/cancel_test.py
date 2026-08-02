@@ -1,0 +1,131 @@
+# #############################################################################
+#  "THE BEER-WARE LICENSE" (Revision 42):                                     #
+#  @eckphi wrote this file. As long as you retain this notice you             #
+#  can do whatever you want with this stuff. If we meet some day, and you think
+#  this stuff is worth it, you can buy me a beer in return Poul-Henning Kamp  #
+# #############################################################################
+"""/cancel, from every state the bot can be in. Closes #78.
+
+`/cancel` is registered with `state="*"` and has to win against whichever
+state handler is currently listening. Every state gets the same three
+questions: is the state gone, was the keyboard taken away, and did anything
+blow up on the way.
+
+The states are read off `LeistungsState` rather than listed here, so a new
+state arrives in this file the moment it is declared.
+"""
+
+from __future__ import annotations
+
+import pytest
+from telebot.handler_backends import State
+
+from leistungsbot.states import LeistungsState
+from tests import support
+
+ALL_STATES = sorted(
+    name
+    for name, value in vars(LeistungsState).items()
+    if isinstance(value, State)
+)
+
+
+def test_every_state_is_covered():
+    """Guards the introspection above: a typo would silently test nothing."""
+    assert len(ALL_STATES) >= 14
+    assert "normalLocation" in ALL_STATES
+    assert "switcherooAlternateLocation" in ALL_STATES
+
+
+def enter(app, state_name: str) -> None:
+    app.bot.set_state(
+        support.ADMIN_USER_ID,
+        getattr(LeistungsState, state_name),
+        support.GROUP_CHAT_ID,
+    )
+    assert support.state_of(app) == f"LeistungsState:{state_name}"
+
+
+@pytest.mark.parametrize("state_name", ALL_STATES)
+def test_cancel_clears_the_state(app, state_name):
+    enter(app, state_name)
+
+    support.send_command(app, "/cancel")
+
+    assert support.state_of(app) is None
+
+
+@pytest.mark.parametrize("state_name", ALL_STATES)
+def test_cancel_says_so(app, state_name):
+    enter(app, state_name)
+
+    support.send_command(app, "/cancel")
+
+    support.assert_said(app, "Halt Stop.")
+
+
+@pytest.mark.parametrize("state_name", ALL_STATES)
+def test_cancel_does_not_report_an_error(app, state_name):
+    enter(app, state_name)
+
+    support.send_command(app, "/cancel")
+
+    support.assert_no_dev_error(app)
+
+
+@pytest.mark.parametrize("state_name", ALL_STATES)
+def test_cancel_takes_the_keyboard_away(app, state_name):
+    """A left over reply keyboard would keep offering a dead workflow."""
+    enter(app, state_name)
+
+    support.send_command(app, "/cancel")
+
+    removals = [
+        kwargs.get("reply_markup")
+        for name, _, kwargs in app.outbox
+        if name == "send_message" and kwargs.get("reply_markup") is not None
+    ]
+    assert any(
+        type(markup).__name__ == "ReplyKeyboardRemove" for markup in removals
+    )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "#13: /cancel is registered with state='*', which telebot only "
+        "matches when a state is actually set, so /cancel outside a "
+        "conversation is silently ignored"
+    ),
+)
+def test_cancel_without_a_state_is_harmless(app):
+    """#13, narrowed down.
+
+    Inside a conversation /cancel works - every test above proves it. What
+    does nothing is /cancel on its own, which is how the command looks to
+    anyone who types it speculatively.
+    """
+    assert support.state_of(app) is None
+
+    support.send_command(app, "/cancel")
+
+    support.assert_said(app, "Halt Stop.")
+    support.assert_no_dev_error(app)
+
+
+def test_cancel_only_clears_the_sender(app):
+    """One user cancelling must not drop somebody else's conversation."""
+    other = 2002
+    enter(app, "normalLocation")
+    app.bot.set_state(
+        other,
+        LeistungsState.rateLocation,
+        support.GROUP_CHAT_ID,
+    )
+
+    support.send_command(app, "/cancel")
+
+    assert support.state_of(app) is None
+    assert (
+        support.state_of(app, user_id=other) == "LeistungsState:rateLocation"
+    )
