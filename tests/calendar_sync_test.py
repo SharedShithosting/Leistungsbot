@@ -246,6 +246,67 @@ def test_a_calendar_that_is_down_does_not_break_the_write(db, sync):
     assert db.getLeistungstag(key)["poll_id"] == 555
 
 
+# ──────────────────────────── the startup pass ──────────────────────────
+
+
+def test_the_backfill_puts_everything_into_the_calendar(db, calendar, sync):
+    """The leistungstage that predate the calendar: nothing announced them,
+    so only this ever gets them there."""
+    keys = [
+        add_leistungstag(db, when=date(2026, 8, 4), poll_id=1),
+        add_leistungstag(db, when=date(2026, 8, 11), poll_id=2),
+    ]
+    calendar.calls.clear()
+
+    assert sync.backfill() == 2
+    assert calendar.kinds == ["add", "add"]
+    assert set(calendar.events) == {event_uid(key) for key in keys}
+
+
+def test_the_backfill_starts_with_the_oldest(db, calendar, sync):
+    old = add_leistungstag(db, when=date(2026, 8, 4), poll_id=1)
+    new = add_leistungstag(db, when=date(2026, 8, 11), poll_id=2)
+    calendar.calls.clear()
+
+    sync.backfill()
+
+    assert calendar.calls == [
+        ("add", event_uid(old)),
+        ("add", event_uid(new)),
+    ]
+
+
+def test_the_backfill_of_an_empty_database_does_nothing(db, calendar, sync):
+    assert sync.backfill() == 0
+    assert calendar.calls == []
+
+
+def test_repeating_the_backfill_does_not_duplicate_anything(
+    db,
+    calendar,
+    sync,
+):
+    """It runs at every start, so it has to be safe to repeat."""
+    add_leistungstag(db)
+
+    sync.backfill()
+    sync.backfill()
+
+    assert len(calendar.events) == 1
+
+
+def test_one_entry_that_fails_does_not_cost_the_rest(db, calendar, sync):
+    add_leistungstag(db, poll_id=1)
+    add_leistungstag(db, poll_id=2)
+    add_leistungstag(db, poll_id=3)
+    failing = MagicMock(spec=Calendar)
+    failing.add_event.side_effect = [RuntimeError("rate limit"), None, None]
+    sync.calendar = failing
+
+    assert sync.backfill() == 2
+    assert failing.add_event.call_count == 3
+
+
 # ────────────────────────── what an entry says ──────────────────────────
 
 

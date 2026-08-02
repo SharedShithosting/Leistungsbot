@@ -46,6 +46,42 @@ def test_main_publishes_the_commands_before_polling(monkeypatch, started):
     started.infinite_poll.assert_called_once()
 
 
+def test_main_syncs_the_calendar_before_polling(monkeypatch, started):
+    """Polling never returns, so anything after it would never run."""
+    run_main(monkeypatch)
+
+    started.sync_calendar.assert_called_once()
+
+
+# --- the calendar backfill ----------------------------------------------
+
+
+def test_without_a_calendar_nothing_is_started(app):
+    assert app.helper.calendar is None
+
+    assert app.sync_calendar() is None
+
+
+def test_the_backfill_can_be_run_here_and_now(app):
+    app.helper.calendar = MagicMock(name="CalendarSync")
+
+    assert app.sync_calendar(background=False) is None
+    app.helper.calendar.backfill.assert_called_once()
+
+
+def test_the_backfill_gets_its_own_thread(app):
+    """One api call per leistungstag - the chat should not wait for the
+    whole history before the bot answers."""
+    app.helper.calendar = MagicMock(name="CalendarSync")
+
+    thread = app.sync_calendar()
+    thread.join(timeout=5)
+
+    assert not thread.is_alive()
+    assert thread.daemon
+    app.helper.calendar.backfill.assert_called_once()
+
+
 def test_main_accepts_the_documented_flags(monkeypatch, started):
     run_main(
         monkeypatch,

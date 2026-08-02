@@ -150,6 +150,45 @@ class CalendarSync:
                 leistungstag.get("key"),
             )
 
+    def backfill(self) -> int:
+        """! Puts every leistungstag the database knows into the calendar
+
+        @returns How many of them made it
+
+        For the leistungstage that already existed when the calendar was
+        configured: they were never announced, so nothing else would ever
+        put them there. Oldest first, so a calendar that is being filled
+        for the first time fills in the order the group lived it.
+
+        Safe to repeat, which is why it can just run at every start: the
+        uid comes from the leistungstag key, so an entry that is already
+        there is written over rather than duplicated.
+
+        One entry that cannot be written does not stop the rest - a single
+        purged location or a rate limit would otherwise cost the whole
+        history.
+        """
+        leistungstage = self.db.getLeistungsTags() or []
+        done = 0
+        failed = 0
+        # getLeistungsTags hands them back newest first
+        for leistungstag in reversed(leistungstage):
+            try:
+                self.calendar.add_event(self.event_for(leistungstag))
+                done += 1
+            except Exception:
+                failed += 1
+                logging.exception(
+                    "calendar: could not sync leistungstag %s",
+                    leistungstag.get("key"),
+                )
+        logging.info(
+            "calendar: %s leistungstage synced, %s failed",
+            done,
+            failed,
+        )
+        return done
+
     def event_for(self, leistungstag: dict) -> CalendarEvent:
         """! The calendar entry a row of the `leistungstag` table describes"""
         info = self.db.getLocationInfoByKey(leistungstag["location"]) or {}

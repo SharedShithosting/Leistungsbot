@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import threading
 from datetime import datetime
 
 import telebot
@@ -166,6 +167,36 @@ class LeistungsBot(
                 **kwargs,
             )
 
+    def sync_calendar(self, background: bool = True):
+        """! Brings the calendar up to date with the whole database
+
+        The subscription in `Helper` only ever hears about *later* writes,
+        so without this a calendar that is configured today stays empty
+        until the next leistungstag is published. Repeating it at every
+        start is deliberate: it is idempotent, and it is also how a
+        calendar that somebody edited by hand finds its way back.
+
+        In a thread by default. It is one api call per leistungstag, and
+        the chat should not have to wait for the history before the bot
+        answers.
+
+        @param background Hand it to a thread instead of doing it here
+        @returns The thread it started, or `None` when there was nothing
+                 to do
+        """
+        if not self.helper.calendar:
+            return None
+        if not background:
+            self.helper.calendar.backfill()
+            return None
+        thread = threading.Thread(
+            target=self.helper.calendar.backfill,
+            name="calendar-backfill",
+            daemon=True,
+        )
+        thread.start()
+        return thread
+
     def infinite_poll(self):
         self.bot.infinity_polling()
 
@@ -226,4 +257,5 @@ def main():
     print("Starting LeistungsBot")
     lb = LeistungsBot()
     lb.publish_commands()
+    lb.sync_calendar()
     lb.infinite_poll()

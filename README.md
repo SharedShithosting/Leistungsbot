@@ -33,6 +33,12 @@ that entry, and purging it takes the entry away again. It hangs off the
 database rather than off the commands, so the scheduler closing a poll on
 its own counts too.
 
+At every start the bot also walks the whole `leistungstag` table into the
+calendar, oldest first and in a background thread. That is what gets the
+leistungstage that predate the calendar in there, and it is safe to
+repeat - an entry is identified by the leistungstag it belongs to, so it
+is written over rather than duplicated.
+
 Off unless configured, which is the `calendar` section:
 
 ```yaml
