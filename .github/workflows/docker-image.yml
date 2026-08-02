@@ -1,57 +1,79 @@
+# Builds the container image and publishes it to Docker Hub and GHCR.
+#
+# Publishing *is* the deployment: the host pulls `eckphi/leistungsbot:latest`,
+# which only ever moves when a `v*.*.*` tag is pushed. Everything else builds
+# an image so breakage is noticed, but never touches `latest`.
+#
+#   pull request   build only, nothing is pushed
+#   push to main   pushed as `main` and `sha-<short>`
+#   tag v1.2.3     pushed as `1.2.3`, `1.2`, `1` and `latest`
+#   schedule       weekly rebuild as `weekly`, picks up base image fixes
+#   dispatch       manual rebuild of whatever ref you pick
 name: Docker Image CI
 on:
-  schedule:
-    - cron: "0 10 * * *"
   push:
-    branches:
-      - "**"
-    tags:
-      - "v*.*.*"
+    branches: [main]
+    tags: ['v*.*.*']
   pull_request:
+  schedule:
+    - cron: "0 10 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
 jobs:
+  # Gate: an image whose tests fail must never reach a registry.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: snok/install-poetry@v1
+        with:
+          version: 2.0.0
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      - run: poetry install --no-interaction --with=dev
+      - run: poetry run pytest tests/ -q
   build:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Set up Python
-        uses: actions/setup-python@v3
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - name: Install poetry
+        run: pip install poetry
+      # Bakes the real version into leistungsbot/_version.py, which is a
+      # placeholder in the repository. /version reports it at runtime.
+      - name: Apply versioning
         run: |
-          pip install poetry
-      - name: Install dependencies
-        run: |
-          poetry install
-      - name: apply versioning
-        run: |
+          poetry install --no-interaction
           poetry dynamic-versioning
-      - uses: SebRollen/toml-action@v1.0.2
-        id: read_version
-        with:
-          file: "pyproject.toml"
-          field: "tool.poetry.version"
+      - uses: docker/setup-buildx-action@v3
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
         with:
-          # list of Docker images to use as base name for tags
           images: |
             eckphi/leistungsbot
-            ghcr.io/SharedShithosting/leistungsbot
-          # generate Docker tags based on the following events/attributes
+            ghcr.io/sharedshithosting/leistungsbot
+          # `latest` is set explicitly below, only for release tags
+          flavor: latest=false
           tags: |
-            type=schedule
-            type=ref,event=branch
             type=ref,event=pr
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-            type=raw,value=${{ steps.read_version.outputs.value }}
+            type=ref,event=branch
+            type=schedule,pattern=weekly
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
             type=sha
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
       - name: Login to Docker Hub
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
@@ -72,3 +94,7 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: mode=max
+          sbom: true
