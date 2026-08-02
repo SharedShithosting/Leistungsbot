@@ -24,6 +24,7 @@ from telebot.storage import StateMemoryStorage
 from telegram_bot_calendar import LSTEP
 from telegram_bot_calendar import DetailedTelegramCalendar
 
+from leistungsbot import Commands
 from leistungsbot import _version
 from leistungsbot import leistungs_config as lc
 from leistungsbot.BotHelper import Helper
@@ -37,37 +38,10 @@ from leistungsbot.leistungs_returns import LeistungsReturnCodes
 # Now, you can pass storage to bot.
 state_storage = StateMemoryStorage()  # you can init here another storage
 
-#      ┌──────────────────────────────────────────────────────────┐
-#      │                        HELP TEXT                         │
-#      └──────────────────────────────────────────────────────────┘
-"""
-User Available Commands:
-    1.  /leistungspoll
-    2.  /add_location
-    3.  /help
-    4.  /purge
-    5.  /mario
-    6.  /start
-    7.  /sendnudes
-    8.  /rate_location
-    9.  /show_participants
-    10. /reminde_me
-    11. /show_locations
-    12. /remove_location
-    13. /location_info
-    14. /zusatzpoll
-    15. /konkurrenzpoll
-    16. /version
-
-Admin Commands: #NOTE: only administrators of the leistungschat
- are allowed for these commands:
-    1. /backup
-
-Developer Commands: #NOTE: ONLY @eckphi is
- allowed for these comands:
-    1. /showIds
-    2. /botlogs
-"""
+# The hand written command list that used to sit here is gone - it had
+# drifted far enough to advertise /mario, /show_participants, /reminde_me
+# and /location_info, none of which have a handler. leistungsbot.Commands is
+# the list now, and /help prints it.
 
 logger = telebot.logger
 telebot.logger.setLevel(logging.DEBUG)  # Outputs debug messages to console.
@@ -315,7 +289,7 @@ class LeistungsBot:
             except Exception as error:
                 self.helper.report_error(call.message, error)
 
-        @bot.message_handler(commands=["showIds"])
+        @bot.message_handler(commands=Commands.SHOW_IDS.names)
         def showIds(message):
             try:
                 if message.from_user.username in lc.config["usernames"]:
@@ -326,7 +300,7 @@ class LeistungsBot:
             except Exception as error:
                 bot.send_message(lc.config["chat_id"], str(error))
 
-        @bot.message_handler(commands=["stats", "groups"])
+        @bot.message_handler(commands=Commands.STATS.names)
         def stats(message):
             try:
                 if message.from_user.username in lc.config["usernames"]:
@@ -356,7 +330,7 @@ class LeistungsBot:
                     pass
                 self.helper.report_error(message, error)
 
-        @bot.message_handler(commands=["botlogs"])
+        @bot.message_handler(commands=Commands.BOTLOGS.names)
         def ViewTheLogsFile(message):
             try:
                 if message.from_user.username in lc.config["usernames"]:
@@ -378,11 +352,18 @@ class LeistungsBot:
             except Exception as error:
                 bot.reply_to(message, f"Error: {error}")
 
-        @bot.message_handler(commands=["help"])
+        @bot.message_handler(commands=Commands.HELP.names)
         def helper(message):
-            return bot.reply_to(message, "Eiso i hüf da do ned...")
+            try:
+                return bot.reply_to(
+                    message,
+                    "Eiso i hüf da do ned...na guat, do host:\n\n"
+                    + Commands.help_text(self.access_of(message)),
+                )
+            except Exception as error:
+                self.helper.report_error(message, error)
 
-        @bot.message_handler(commands=["purge"])
+        @bot.message_handler(commands=Commands.PURGE.names)
         def purge(message):
             if not self.helper.sender_has_permission(message):
                 bot.reply_to(
@@ -405,21 +386,21 @@ class LeistungsBot:
             except Exception as error:
                 self.helper.report_error(message, error)
 
-        @bot.message_handler(commands=["alive"])
+        @bot.message_handler(commands=Commands.ALIVE.names)
         def alive(message):
             bot.reply_to(
                 message,
                 f"Hey {message.from_user.username}, Ready To Serve You in version {_version.__version__}",
             )
 
-        @bot.message_handler(commands=["start"])
+        @bot.message_handler(commands=Commands.START.names)
         def start(message):
             bot.reply_to(
                 message,
                 f"Heya {message.from_user.username}, I am there to help you in polls. But this cmd is bit old try /help.",
             )
 
-        @bot.message_handler(commands=["leistungspoll"])
+        @bot.message_handler(commands=Commands.LEISTUNGSPOLL.names)
         def poll_now(message):
             try:
                 if not self.helper.sender_has_permission(message):
@@ -441,7 +422,7 @@ class LeistungsBot:
             except Exception as error:
                 self.helper.report_error(message, error)
 
-        @bot.message_handler(commands=["zusatzpoll"])
+        @bot.message_handler(commands=Commands.ZUSATZPOLL.names)
         def zusatz_poll(message):
             try:
                 if not self.helper.sender_has_permission(message):
@@ -463,7 +444,7 @@ class LeistungsBot:
             except Exception as error:
                 self.helper.report_error(message, error)
 
-        @bot.message_handler(commands=["konkurrenzpoll"])
+        @bot.message_handler(commands=Commands.KONKURRENZPOLL.names)
         def konkurrenz_poll(message):
             try:
                 if not self.helper.sender_has_permission(message):
@@ -485,7 +466,7 @@ class LeistungsBot:
             except Exception as error:
                 self.helper.report_error(message, error)
 
-        @bot.message_handler(commands=["sendreminder"])
+        @bot.message_handler(commands=Commands.SENDREMINDER.names)
         def send_reminder(message: telebot.types.Message):
             try:
                 self.bot.set_state(
@@ -549,7 +530,7 @@ class LeistungsBot:
 
                 self.helper.report_error(message, error)
 
-        @bot.message_handler(commands=["closepoll"])
+        @bot.message_handler(commands=Commands.CLOSEPOLL.names)
         def close_poll(message):
             try:
                 if not self.helper.sender_has_permission(message):
@@ -572,7 +553,7 @@ class LeistungsBot:
             except Exception as error:
                 self.helper.report_error(message, error)
 
-        @bot.message_handler(commands=["sneaky_closepoll"])
+        @bot.message_handler(commands=Commands.SNEAKY_CLOSEPOLL.names)
         def sneaky_close_poll(message: telebot.types.Message) -> None:
             try:
                 if not self.helper.sender_has_permission(message):
@@ -595,7 +576,7 @@ class LeistungsBot:
             except Exception as error:
                 self.helper.report_error(message, error)
 
-        @bot.message_handler(commands=["sendnudes"])
+        @bot.message_handler(commands=Commands.SENDNUDES.names)
         def send_nudes(message):
             try:
                 if message.chat.type != "private":
@@ -608,7 +589,7 @@ class LeistungsBot:
             except Exception as error:
                 self.helper.report_error(message, error)
 
-        @bot.message_handler(commands=["add_location"])
+        @bot.message_handler(commands=Commands.ADD_LOCATION.names)
         def add_location(message):
             try:
                 self.bot.set_state(
@@ -623,7 +604,7 @@ class LeistungsBot:
             except Exception as error:
                 self.helper.report_error(message, error)
 
-        @bot.message_handler(commands=["backup"])
+        @bot.message_handler(commands=Commands.BACKUP.names)
         def backup(message):
             try:
                 if not self.helper.sender_has_permission(message):
@@ -638,7 +619,7 @@ class LeistungsBot:
             except Exception as error:
                 self.helper.report_error(message, error)
 
-        @bot.message_handler(commands=["remove_location"])
+        @bot.message_handler(commands=Commands.REMOVE_LOCATION.names)
         def remove_location_handler(message):
             try:
                 if not self.helper.sender_has_permission(message):
@@ -661,14 +642,14 @@ class LeistungsBot:
             except Exception as error:
                 self.helper.report_error(message, error)
 
-        @bot.message_handler(commands=["history"])
+        @bot.message_handler(commands=Commands.HISTORY.names)
         def history(message):
             try:
                 self.process_history(message)
             except Exception as error:
                 self.helper.report_error(message, error)
 
-        @bot.message_handler(commands=["rate_location"])
+        @bot.message_handler(commands=Commands.RATE_LOCATION.names)
         def rate_location_handler(message):
             try:
                 if message.chat.type != "private":
@@ -699,7 +680,7 @@ class LeistungsBot:
             except Exception as error:
                 self.helper.report_error(message, error)
 
-        @bot.message_handler(commands=["show_locations"])
+        @bot.message_handler(commands=Commands.SHOW_LOCATIONS.names)
         def show_locations(message):
             try:
                 bot.reply_to(
@@ -710,7 +691,7 @@ class LeistungsBot:
             except Exception as error:
                 self.helper.report_error(message, error)
 
-        @bot.message_handler(commands=["message"])
+        @bot.message_handler(commands=Commands.MESSAGE.names)
         def message_handler(message: telebot.types.Message):
             try:
                 self.bot.set_state(
@@ -750,7 +731,7 @@ class LeistungsBot:
             except Exception as error:
                 self.helper.report_error(message, error)
 
-        @bot.message_handler(state="*", commands=["cancel"])
+        @bot.message_handler(state="*", commands=Commands.CANCEL.names)
         def cancel(message):
             try:
                 self.process_cancle(message)
@@ -943,7 +924,7 @@ class LeistungsBot:
             self.user_context[message.from_user.id]["leistungstag"] = None
             # TODO: Edit poll message, if possible
 
-        @bot.message_handler(commands=["switcheroo"])
+        @bot.message_handler(commands=Commands.SWITCHEROO.names)
         def switcheroo(message: telebot.types.Message) -> None:
             if not self.helper.sender_has_permission(message):
                 self.bot.reply_to(
@@ -982,12 +963,50 @@ class LeistungsBot:
         #         )
         #         bot.reply_to(message, f"An error occurred!\nError: {error}")
 
-        @bot.message_handler(commands=["version"])
+        @bot.message_handler(commands=Commands.VERSION.names)
         def version(message):
             bot.reply_to(
                 message,
                 f"LeistungsBot - {_version.__version__}",
             )
+
+    def publish_commands(self) -> None:
+        """! Hands the command list to telegram, for the in-app menu
+
+        Only the public commands: the menu is the same for everybody, so
+        putting the admin ones in it would advertise commands most of the
+        chat cannot run. They keep working when typed.
+
+        Called from `main`, not from `__init__` - this is an api call, and a
+        freshly constructed bot must stay usable without one.
+        """
+        try:
+            self.bot.set_my_commands(
+                Commands.as_telebot(
+                    Commands.visible_to(Commands.Access.PUBLIC),
+                ),
+            )
+        except Exception:
+            # a bot that cannot publish its menu is still a working bot
+            logging.warning("could not publish the commands", exc_info=True)
+
+    def access_of(self, message) -> Commands.Access:
+        """! How much of the command list `message`'s sender may see
+
+        Mirrors the two checks the handlers themselves use. It only decides
+        what `/help` prints - a sender who talks their way past this still
+        meets the handler's own check.
+        """
+        if message.from_user.username in lc.config["usernames"]:
+            return Commands.Access.OWNER
+        try:
+            if self.helper.sender_has_permission(message):
+                return Commands.Access.ADMIN
+        except Exception:
+            # not reachable from this chat, or telegram said no - the
+            # public list is the safe answer, not an error
+            logging.debug("could not resolve admin status", exc_info=True)
+        return Commands.Access.PUBLIC
 
     def process_cancle(self, message):
         self.bot.send_message(
@@ -1335,4 +1354,5 @@ def main():
     lc.set_args(args, dots=True)
     print("Starting LeistungsBot")
     lb = LeistungsBot()
+    lb.publish_commands()
     lb.infinite_poll()
