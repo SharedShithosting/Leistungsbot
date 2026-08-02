@@ -55,6 +55,18 @@ def table_contents(connection, table: str) -> list[tuple]:
     return cursor.fetchall()
 
 
+def unavailable(what: str) -> None:
+    """Skip, unless the environment insists that it must be available.
+
+    The `pytest` workflow sets LEISTUNGSBOT_REQUIRE_DB, because it is the
+    only place these tests can run - a silent skip there means they never
+    run at all, which is how they got missed the first time.
+    """
+    if os.environ.get("LEISTUNGSBOT_REQUIRE_DB"):
+        pytest.fail(f"LEISTUNGSBOT_REQUIRE_DB is set but {what}")
+    pytest.skip(what)
+
+
 @pytest.fixture(scope="module")
 def live_db() -> LeistungsDB:
     """A LeistungsDB on the configured server, or a skip."""
@@ -65,7 +77,11 @@ def live_db() -> LeistungsDB:
     except Exception:
         reachable = False
     if not reachable:
-        pytest.skip("no mysql server reachable")
+        unavailable(
+            "no mysql server reachable at "
+            f"{lc.config['mysql']['host']}/{lc.config['mysql']['db']} "
+            f"as {lc.config['mysql']['user']}",
+        )
     return db
 
 
@@ -83,7 +99,7 @@ def root_connection():
     """
     password = os.environ.get("MYSQL_ROOT")
     if not password:
-        pytest.skip("MYSQL_ROOT is not set, cannot create a scratch database")
+        unavailable("MYSQL_ROOT is not set, cannot create a scratch database")
 
     connection = mysql.connector.connect(
         host=lc.config["mysql"]["host"],
