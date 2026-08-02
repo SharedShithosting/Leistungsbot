@@ -27,6 +27,14 @@ ADMIN_USER_ID = 42
 ADMIN_USERNAME = "eckphi"
 GROUP_CHAT_ID = 100
 
+#: The bot's own account. A message carrying an inline keyboard was sent by
+#: the bot, so telegram puts *this* in its ``from`` - not the person who
+#: presses the button. Code that wants the presser has to read
+#: ``callback.from_user``, and the harness has to model that or it hides the
+#: difference. See #78.
+BOT_USER_ID = 7
+BOT_USERNAME = "leistungsbot"
+
 
 def message_payload(
     text: str,
@@ -66,15 +74,32 @@ def make_callback(
     chat_id: int = GROUP_CHAT_ID,
     message_id: int = 1,
     reply_to_message: dict[str, Any] | None = None,
+    carrier_from_bot: bool = True,
 ) -> telebot.types.CallbackQuery:
-    """Build a callback query carrying the bot's json ``{"🍻cmd": value}``."""
+    """Build a callback query carrying the bot's json ``{"🍻cmd": value}``.
+
+    ``user_id`` is the person pressing the button, and lands in
+    ``callback.from_user``.
+
+    The message the button sits on was sent by the *bot*, so its ``from`` is
+    the bot's account - which is why ``callback.message.from_user`` is not
+    the presser and never was. This used to be built with the presser in
+    both places, which is precisely what let the cancel buttons look like
+    they cleared somebody's state (#78). Pass
+    ``carrier_from_bot=False`` for the rare case of a button on a message a
+    user actually sent.
+    """
+    author = BOT_USER_ID if carrier_from_bot else user_id
     message = message_payload(
         "poll message",
-        user_id=user_id,
+        user_id=author,
         chat_id=chat_id,
         message_id=message_id,
         reply_to_message=reply_to_message,
+        username=BOT_USERNAME if carrier_from_bot else ADMIN_USERNAME,
     )
+    if carrier_from_bot:
+        message["from"]["is_bot"] = True
     return telebot.types.CallbackQuery.de_json(
         {
             "id": "cb-1",

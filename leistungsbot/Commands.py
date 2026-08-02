@@ -66,7 +66,16 @@ HELP = Command("help", "Display help message")
 START = Command("start", "Say hello")
 ALIVE = Command("alive", "Check if I am up")
 VERSION = Command("version", "Show the running version")
-CANCEL = Command("cancel", "Cancel current conversation")
+#: `cancle` is the spelling the code uses internally - `process_cancle`, and
+#: the `🍻cancle` callback payload - so it is the typo people actually make.
+#: It answers as an alias rather than being renamed everywhere: the payload
+#: string is baked into every inline keyboard the bot has already sent, and
+#: renaming it would break the buttons on those messages after a deploy.
+CANCEL = Command(
+    "cancel",
+    "Cancel current conversation",
+    aliases=("cancle",),
+)
 SENDNUDES = Command("sendnudes", "😈")
 MESSAGE = Command("message", "Send custom message", Access.ADMIN)
 

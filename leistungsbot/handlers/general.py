@@ -144,13 +144,26 @@ class GeneralHandlers:
             # a bot that cannot publish its menu is still a working bot
             logging.warning("could not publish the commands", exc_info=True)
 
-    def process_cancle(self, message):
+    def process_cancle(self, message, user_id: int | None = None) -> None:
+        """! Ends whatever the sender was in the middle of
+
+        @param message Where to answer, and whose author to clear by default
+        @param user_id Who to clear instead, when that is not the author
+
+        `user_id` has to be passed from a callback. The message an inline
+        button sits on was sent by the bot, so its `from_user` is the bot's
+        own account and clearing that state clears nothing - the button
+        answered "Halt Stop." while leaving the presser exactly where they
+        were. See #78.
+        """
         self.bot.send_message(
             message.chat.id,
             "Halt Stop.",
             reply_markup=telebot.types.ReplyKeyboardRemove(),
         )
-        self.bot.delete_state(message.from_user.id, message.chat.id)
+        if user_id is None:
+            user_id = message.from_user.id
+        self.bot.delete_state(user_id, message.chat.id)
 
     def process_send_nudes(self, chat_id):
         self.helper.send_nude(chat_id)

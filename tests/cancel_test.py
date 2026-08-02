@@ -113,6 +113,92 @@ def test_cancel_without_a_state_is_harmless(app):
     support.assert_no_dev_error(app)
 
 
+# --- the 🍻cancle buttons -----------------------------------------------
+#
+# Every "Na" / "Des mochn ma ned!" button sends the same payload. The
+# message they sit on was sent by the bot, so the handler has to take the
+# presser from the callback and not from the message it is attached to.
+
+
+@pytest.mark.parametrize("state_name", ALL_STATES)
+def test_the_cancel_button_clears_the_pressers_state(app, state_name):
+    enter(app, state_name)
+
+    support.press(app, {"🍻cancle": None})
+
+    assert support.state_of(app) is None
+
+
+def test_the_cancel_button_says_so(app):
+    enter(app, "searchLocation")
+
+    support.press(app, {"🍻cancle": None})
+
+    support.assert_said(app, "Halt Stop.")
+
+
+def test_the_cancel_button_does_not_clear_somebody_else(app):
+    other = 3003
+    enter(app, "normalLocation")
+    app.bot.set_state(
+        other,
+        LeistungsState.rateLocation,
+        support.GROUP_CHAT_ID,
+    )
+
+    support.press(app, {"🍻cancle": None}, user_id=support.ADMIN_USER_ID)
+
+    assert support.state_of(app) is None
+    assert (
+        support.state_of(app, user_id=other) == "LeistungsState:rateLocation"
+    )
+
+
+def test_the_cancel_button_from_an_unknown_location(app, db):
+    """The case #78 reproduced by hand: /leistungspoll, a location the bot
+    does not know, then "Na"."""
+    db.getLocationInfo.side_effect = lambda name: None
+
+    support.send_command(app, "/leistungspoll")
+    support.send_command(app, "Nicht Existent")
+    assert support.state_of(app) == "LeistungsState:searchLocation"
+
+    support.press(app, {"🍻cancle": None})
+
+    assert support.state_of(app) is None
+
+
+# --- typing it wrong ----------------------------------------------------
+
+
+@pytest.mark.parametrize("state_name", ALL_STATES)
+def test_the_misspelling_works_too(app, state_name):
+    """`cancle` is how the code spells it internally, so it is the typo
+    people make. It is an alias rather than swallowed as text input."""
+    enter(app, state_name)
+
+    support.send_command(app, "/cancle")
+
+    assert support.state_of(app) is None
+    support.assert_said(app, "Halt Stop.")
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "#17: any command that is not registered is eaten as text input by "
+        "whatever state handler is listening, instead of falling through"
+    ),
+)
+def test_an_unregistered_command_is_not_swallowed(app):
+    support.send_command(app, "/leistungspoll")
+
+    support.send_command(app, "/thisisnotacommand")
+
+    said = " ".join(support.sent_texts(app))
+    assert "kenn i ned" not in said, "taken as a location name"
+
+
 def test_cancel_only_clears_the_sender(app):
     """One user cancelling must not drop somebody else's conversation."""
     other = 2002
