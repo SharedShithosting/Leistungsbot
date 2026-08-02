@@ -16,9 +16,52 @@ from leistungsbot.BotHelper import LeistungsTyp
 from leistungsbot.leistungs_returns import LeistungsReturnCodes
 from leistungsbot.states import LeistungsState
 
+#: The buttons only an administrator of the leistungschat may press.
+#:
+#: Mirrors `Commands.Access.ADMIN` on the command that offers the button:
+#: everything reached from /leistungspoll, /purge, /closepoll, /sendreminder
+#: or /message. The public flows - adding a location, the history, the
+#: ratings, and the cancel button - are deliberately not in here.
+#:
+#: Written without the 🍻 prefix, `callback_query` strips it before matching.
+ADMIN_CALLBACKS = frozenset(
+    {
+        "publish",
+        "purge_type",
+        "dry_purge",
+        "purge",
+        "open",
+        # the "Nö" next to the open polls, /message's do-not-reply-to-a-poll
+        "no",
+        "closed",
+        "poll_date",
+        "open_hours_checked",
+    },
+)
+
 
 class CallbackHandlers:
     """The single entry point for every inline button the bot sends."""
+
+    def presser_has_permission(self, call) -> bool:
+        """! Whether the person who pressed the button may go on
+
+        The presser is `call.from_user`. `call.message` is the message the
+        inline keyboard sits on, and the bot sent that one - handing it to
+        `sender_has_permission` asks whether the *bot* is an administrator
+        of the leistungschat. It is, in the usual setup, so that check said
+        yes to everybody. See #99.
+
+        Refuses out loud, so a button that does nothing does not look like a
+        bot that is broken.
+        """
+        if self.helper.user_has_permission(call.from_user.id):
+            return True
+        self.bot.reply_to(
+            call.message,
+            "Diese Funktion ist nicht für den Pöbel gedacht.",
+        )
+        return False
 
     def callback_query(self, call):
         try:
@@ -32,6 +75,11 @@ class CallbackHandlers:
             cmd = [*data][0].replace("🍻", "")
             val = [*data.values()][0]
             self.bot.answer_callback_query(call.id, "Copy that")
+            if cmd in ADMIN_CALLBACKS and not self.presser_has_permission(
+                call,
+            ):
+                # the keyboard stays: somebody who may press it still can
+                return
             if cmd == "search":
                 self.helper.approve_location(
                     call.message.chat.id,
@@ -119,7 +167,11 @@ class CallbackHandlers:
                     )
                     == LeistungsState.remindePoll.name
                 ):
-                    self.process_reminder(call.message, val)
+                    self.process_reminder(
+                        call.message,
+                        val,
+                        call.from_user.id,
+                    )
                 elif (
                     self.bot.get_state(
                         call.from_user.id,
@@ -127,7 +179,11 @@ class CallbackHandlers:
                     )
                     == LeistungsState.closePoll.name
                 ):
-                    self.process_closepoll(call.message, val)
+                    self.process_closepoll(
+                        call.message,
+                        val,
+                        user_id=call.from_user.id,
+                    )
                 elif (
                     self.bot.get_state(
                         call.from_user.id,
@@ -135,7 +191,12 @@ class CallbackHandlers:
                     )
                     == LeistungsState.sneakyClosePoll.name
                 ):
-                    self.process_closepoll(call.message, val, True)
+                    self.process_closepoll(
+                        call.message,
+                        val,
+                        True,
+                        user_id=call.from_user.id,
+                    )
                 elif (
                     self.bot.get_state(
                         call.from_user.id,
