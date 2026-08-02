@@ -90,7 +90,7 @@ class PollHandlers:
         try:
             location = self.process_poll_location(message)
             if location:
-                self.poller = PersistantLeistungsTagPoller(
+                self.context_of(message).poller = PersistantLeistungsTagPoller(
                     self.helper,
                     message.chat.id,
                     location,
@@ -108,7 +108,7 @@ class PollHandlers:
         try:
             location = self.process_poll_location(message)
             if location:
-                self.poller = PersistantLeistungsTagPoller(
+                self.context_of(message).poller = PersistantLeistungsTagPoller(
                     self.helper,
                     message.chat.id,
                     location,
@@ -126,7 +126,7 @@ class PollHandlers:
         try:
             location = self.process_poll_location(message)
             if location:
-                self.poller = PersistantLeistungsTagPoller(
+                self.context_of(message).poller = PersistantLeistungsTagPoller(
                     self.helper,
                     message.chat.id,
                     location,
@@ -153,15 +153,16 @@ class PollHandlers:
                 call.message.chat.id,
                 call.message.message_id,
             )
-            if not self.poller:
+            poller = self.context_of(call).poller
+            if not poller:
                 self.helper.bot.send_message(
                     call.message.chat_id,
                     "Da is wohl was schiefglaufen, i kann ka poll findn...",
                 )
                 return
             if (
-                self.poller.type == LeistungsTyp.NORMAL
-                or self.poller.type == LeistungsTyp.KONKURENZ
+                poller.type == LeistungsTyp.NORMAL
+                or poller.type == LeistungsTyp.KONKURENZ
             ) and result.weekday() != 1:
                 self.helper.bot.send_message(
                     call.message.chat.id,
@@ -199,12 +200,13 @@ class PollHandlers:
         return None
 
     def check_open_hours_before_sending(self, call, date: date):
-        open_state = self.helper.check_open_hours(self.poller.location, date)
+        poller = self.context_of(call).poller
+        open_state = self.helper.check_open_hours(poller.location, date)
 
         if open_state[0] == Openness.OPEN:
-            self.poller.dry_send_with_date(date)
+            poller.dry_send_with_date(date)
         else:
-            self.poller.date = date
+            poller.date = date
 
             if open_state[0] == Openness.CLOSED:
                 self.bot.send_message(
@@ -235,4 +237,4 @@ class PollHandlers:
 
     def process_check_open_hours(self, callback, open_hours_correct):
         if open_hours_correct:
-            self.poller.dry_send()
+            self.context_of(callback).poller.dry_send()

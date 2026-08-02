@@ -113,10 +113,20 @@ class LeistungsBot(
         self.bot.add_custom_filter(custom_filters.StateFilter(self.bot))
         self.helper = Helper(self.bot)
         self.scheduler = Scheduler(self.bot, self.helper)
-        self.poller = None
         self.last_text_nudes = datetime.min
         self.user_context: dict[int, UserContext] = {}
         self.register_handlers()
+
+    def context_of(self, update) -> UserContext:
+        """! The scratch space belonging to whoever sent `update`
+
+        `update` is a Message or a CallbackQuery - both carry `from_user`,
+        which is the whole reason this takes the update and not an id.
+
+        Everything half finished lives in here, keyed by user, so two people
+        can run the same workflow at the same time.
+        """
+        return self.user_context.setdefault(update.from_user.id, UserContext())
 
     def register_handlers(self) -> None:
         """! Points telebot at the handler methods, in order

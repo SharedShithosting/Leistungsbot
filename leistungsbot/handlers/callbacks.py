@@ -160,7 +160,7 @@ class CallbackHandlers:
                 )
             elif cmd == "poll_date":
                 if val:
-                    if not self.poller:
+                    if not self.context_of(call).poller:
                         self.helper.bot.send_message(
                             call.message.chat_id,
                             "Da is wohl was schiefglaufen, i kann ka poll findn...",

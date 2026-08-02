@@ -191,10 +191,7 @@ class PollLifecycleHandlers:
 
         print(f'Location {lt["location"]}')
 
-        if message.from_user.id not in self.user_context:
-            self.user_context[message.from_user.id] = {"leistungstag": lt}
-        else:
-            self.user_context[message.from_user.id]["leistungstag"] = lt
+        self.context_of(message).leistungstag = lt
 
         self.bot.send_message(
             message.chat.id,
@@ -211,11 +208,8 @@ class PollLifecycleHandlers:
         self,
         message: telebot.types.Message,
     ) -> None:
-        if (
-            message.from_user.id not in self.user_context
-            or "leistungstag" not in self.user_context[message.from_user.id]
-            or self.user_context[message.from_user.id]["leistungstag"] is None
-        ):
+        context = self.context_of(message)
+        if context.leistungstag is None:
             self.bot.send_message(
                 message.chat.id,
                 "Could not find Leistungstag in UserContext. This should not happen, please try again ...",
@@ -240,7 +234,7 @@ class PollLifecycleHandlers:
             )
 
         else:
-            lt = self.user_context[message.from_user.id]["leistungstag"]
+            lt = context.leistungstag
             self.helper.db.switchLeistungstagLocation(
                 lt["key"],
                 lt["location"],
@@ -253,7 +247,7 @@ class PollLifecycleHandlers:
             )
             self.bot.delete_state(message.from_user.id, message.chat.id)
 
-        self.user_context[message.from_user.id]["leistungstag"] = None
+        context.leistungstag = None
 
     def process_reminder(self, message, leistungstag_key):
         if not self.helper.sender_has_permission(message):

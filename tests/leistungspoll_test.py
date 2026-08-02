@@ -70,8 +70,8 @@ def test_known_location_leads_to_the_date_question(app):
 
     support.assert_no_dev_error(app)
     support.assert_said(app, "Für wann wollen ma pollen?")
-    assert app.poller.location == "Bar A"
-    assert app.poller.type == LeistungsTyp.NORMAL
+    assert support.poller_of(app).location == "Bar A"
+    assert support.poller_of(app).type == LeistungsTyp.NORMAL
     # the location question is answered, the state has to be gone again
     assert support.state_of(app) is None
 
@@ -108,7 +108,7 @@ def test_visited_location_warns_but_continues(app, db):
     support.assert_no_dev_error(app)
     support.assert_said(app, "Do woan ma schomoi")
     support.assert_said(app, "Für wann wollen ma pollen?")
-    assert app.poller.location == "Bar A"
+    assert support.poller_of(app).location == "Bar A"
 
 
 def test_open_location_goes_straight_to_the_dry_run(app, db, google):
@@ -171,7 +171,7 @@ def test_confirming_the_open_hours_sends_the_dry_run(app, google):
 
     support.assert_no_dev_error(app)
     app.bot.send_poll.assert_called_once()
-    assert app.poller.date.strftime(DATEFORMAT) == date_str
+    assert support.poller_of(app).date.strftime(DATEFORMAT) == date_str
 
 
 def test_aborting_the_open_hours_sends_nothing(app, google):

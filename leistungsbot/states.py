@@ -12,10 +12,14 @@ state without importing `Bot`, which imports them.
 
 from __future__ import annotations
 
-from typing import TypedDict
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from telebot.handler_backends import State
 from telebot.handler_backends import StatesGroup
+
+if TYPE_CHECKING:
+    from leistungsbot.BotHelper import PersistantLeistungsTagPoller
 
 
 class LeistungsState(StatesGroup):
@@ -38,5 +42,18 @@ class LeistungsState(StatesGroup):
     switcherooAlternateLocation = State()
 
 
-class UserContext(TypedDict):
-    leistungstag: dict | None
+@dataclass
+class UserContext:
+    """! One user's half finished workflow
+
+    `poller` used to be `LeistungsBot.poller`, a single attribute shared by
+    the whole bot: whoever ran /leistungspoll last owned it, and a second
+    person starting a poll silently took it away from the first. That is
+    #14. It is keyed by user here, like `leistungstag` always was.
+
+    Reach for it through `LeistungsBot.context_of`, which takes either a
+    Message or a CallbackQuery.
+    """
+
+    poller: PersistantLeistungsTagPoller | None = None
+    leistungstag: dict | None = None

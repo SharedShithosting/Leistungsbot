@@ -33,7 +33,7 @@ def test_location_leads_to_the_date_suggestion(app):
     support.send_command(app, "Bar A")
 
     support.assert_no_dev_error(app)
-    assert app.poller.type == LeistungsTyp.KONKURENZ
+    assert support.poller_of(app).type == LeistungsTyp.KONKURENZ
     support.assert_said(app, "Für wann wollen ma pollen?")
 
 
