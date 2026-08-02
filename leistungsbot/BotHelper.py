@@ -146,7 +146,7 @@ class Helper:
         markup.add(
             InlineKeyboardButton(
                 "Na",
-                callback_data=json.dumps({"🍻cancle": None}),
+                callback_data=json.dumps({"🍻cancel": None}),
             ),
             InlineKeyboardButton(
                 "Jo",
@@ -272,7 +272,7 @@ class Helper:
         markup.add(
             InlineKeyboardButton(
                 "Des mochn ma ned!",
-                callback_data=json.dumps({"🍻cancle": None}),
+                callback_data=json.dumps({"🍻cancel": None}),
             ),
             InlineKeyboardButton(
                 "Weg damit",
@@ -288,7 +288,7 @@ class Helper:
         markup.add(
             InlineKeyboardButton(
                 "Na",
-                callback_data=json.dumps({"🍻cancle": None}),
+                callback_data=json.dumps({"🍻cancel": None}),
             ),
             InlineKeyboardButton(
                 "Jo",
@@ -304,7 +304,7 @@ class Helper:
         markup.add(
             InlineKeyboardButton(
                 "Na",
-                callback_data=json.dumps({"🍻cancle": None}),
+                callback_data=json.dumps({"🍻cancel": None}),
             ),
             InlineKeyboardButton(
                 "Jo",

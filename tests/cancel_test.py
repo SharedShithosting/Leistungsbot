@@ -113,7 +113,7 @@ def test_cancel_without_a_state_is_harmless(app):
     support.assert_no_dev_error(app)
 
 
-# --- the 🍻cancle buttons -----------------------------------------------
+# --- the 🍻cancel buttons -----------------------------------------------
 #
 # Every "Na" / "Des mochn ma ned!" button sends the same payload. The
 # message they sit on was sent by the bot, so the handler has to take the
@@ -124,7 +124,7 @@ def test_cancel_without_a_state_is_harmless(app):
 def test_the_cancel_button_clears_the_pressers_state(app, state_name):
     enter(app, state_name)
 
-    support.press(app, {"🍻cancle": None})
+    support.press(app, {"🍻cancel": None})
 
     assert support.state_of(app) is None
 
@@ -132,7 +132,7 @@ def test_the_cancel_button_clears_the_pressers_state(app, state_name):
 def test_the_cancel_button_says_so(app):
     enter(app, "searchLocation")
 
-    support.press(app, {"🍻cancle": None})
+    support.press(app, {"🍻cancel": None})
 
     support.assert_said(app, "Halt Stop.")
 
@@ -146,7 +146,7 @@ def test_the_cancel_button_does_not_clear_somebody_else(app):
         support.GROUP_CHAT_ID,
     )
 
-    support.press(app, {"🍻cancle": None}, user_id=support.ADMIN_USER_ID)
+    support.press(app, {"🍻cancel": None}, user_id=support.ADMIN_USER_ID)
 
     assert support.state_of(app) is None
     assert (
@@ -163,7 +163,7 @@ def test_the_cancel_button_from_an_unknown_location(app, db):
     support.send_command(app, "Nicht Existent")
     assert support.state_of(app) == "LeistungsState:searchLocation"
 
-    support.press(app, {"🍻cancle": None})
+    support.press(app, {"🍻cancel": None})
 
     assert support.state_of(app) is None
 
@@ -173,11 +173,11 @@ def test_the_cancel_button_from_an_unknown_location(app, db):
 
 @pytest.mark.parametrize("state_name", ALL_STATES)
 def test_the_misspelling_works_too(app, state_name):
-    """`cancle` is how the code spells it internally, so it is the typo
+    """`cancel` is how the code spells it internally, so it is the typo
     people make. It is an alias rather than swallowed as text input."""
     enter(app, state_name)
 
-    support.send_command(app, "/cancle")
+    support.send_command(app, "/cancel")
 
     assert support.state_of(app) is None
     support.assert_said(app, "Halt Stop.")

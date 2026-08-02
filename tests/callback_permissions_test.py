@@ -158,7 +158,7 @@ def test_the_refusal_leaves_the_keyboard_alone(pleb):
 def test_a_pleb_may_still_cancel(pleb):
     enter(pleb, "searchLocation")
 
-    support.press(pleb, {"🍻cancle": None})
+    support.press(pleb, {"🍻cancel": None})
 
     support.assert_not_said(pleb, REFUSAL)
     assert support.state_of(pleb) is None
@@ -241,7 +241,7 @@ def test_the_public_callbacks_are_not_in_the_admin_list():
     """The flows anybody may run: adding a location, history, ratings."""
     assert ADMIN_CALLBACKS.isdisjoint(
         {
-            "cancle",
+            "cancel",
             "search",
             "select",
             "q",

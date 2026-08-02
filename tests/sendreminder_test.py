@@ -164,7 +164,7 @@ def test_a_pleb_cannot_confirm_a_reminder(pleb, db):
 def test_saying_no_does_not_send_a_reminder(app, db):
     db.getLeistungstag.return_value = make_leistungstag()
 
-    support.press(app, {"🍻cancle": None})
+    support.press(app, {"🍻cancel": None})
 
     support.assert_said(app, "Halt Stop.")
 

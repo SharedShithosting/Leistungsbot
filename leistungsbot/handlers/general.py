@@ -51,7 +51,7 @@ class GeneralHandlers:
 
     def cancel(self, message):
         try:
-            self.process_cancle(message)
+            self.process_cancel(message)
         except Exception as error:
             self.helper.report_error(message, error)
 
@@ -144,7 +144,7 @@ class GeneralHandlers:
             # a bot that cannot publish its menu is still a working bot
             logging.warning("could not publish the commands", exc_info=True)
 
-    def process_cancle(self, message, user_id: int | None = None) -> None:
+    def process_cancel(self, message, user_id: int | None = None) -> None:
         """! Ends whatever the sender was in the middle of
 
         @param message Where to answer, and whose author to clear by default

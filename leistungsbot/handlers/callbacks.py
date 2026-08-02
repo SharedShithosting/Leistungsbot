@@ -108,10 +108,10 @@ class CallbackHandlers:
                             call.message.chat.id,
                             "Des isch scho drin, du deppata!",
                         )
-            elif cmd == "cancle":
+            elif cmd == "cancel":
                 # call.from_user, not call.message.from_user: the message
                 # the button sits on was sent by the bot
-                self.process_cancle(call.message, call.from_user.id)
+                self.process_cancel(call.message, call.from_user.id)
             elif cmd == "publish":
                 self.helper.publish_leistungstag(val)
                 self.bot.send_message(

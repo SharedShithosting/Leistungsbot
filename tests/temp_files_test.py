@@ -111,6 +111,6 @@ def test_a_rejected_dry_run_cleans_up(app):
 
     assert scratch_files(app), "nothing was written, test proves nothing"
 
-    support.press(app, {"🍻cancle": None})
+    support.press(app, {"🍻cancel": None})
 
     assert scratch_files(app) == []
