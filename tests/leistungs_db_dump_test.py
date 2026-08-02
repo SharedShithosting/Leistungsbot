@@ -16,9 +16,11 @@ from datetime import date
 from datetime import datetime
 from decimal import Decimal
 
+import mysql.connector
 import pytest
 from mysql.connector.conversion import MySQLConverter
 
+from leistungsbot.leistungs_db import DUMP_INCOMPLETE
 from leistungsbot.leistungs_db import LeistungsDB
 
 SHOW_TABLES = [
@@ -40,6 +42,8 @@ class FakeCursor:
         self.result: list[tuple] = []
         self.description: list[tuple] = []
         self.queries: list[str] = []
+        # views the user is not allowed to read the definition of
+        self.deny_views: set[str] = set()
 
     def execute(self, sql, values=None):
         self.queries.append(sql)
@@ -55,6 +59,8 @@ class FakeCursor:
             self.result = [(table, create)]
         elif sql.startswith("SHOW CREATE VIEW"):
             view = sql.split("`")[1]
+            if view in self.deny_views:
+                raise denied(view)
             self.result = [(view, CREATE_VIEW)]
         elif sql.startswith("SELECT * FROM"):
             table = sql.split("`")[1]
@@ -149,6 +155,45 @@ def test_empty_table_gets_no_insert(real_db):
 
     assert "INSERT INTO" not in dump
     assert f"{CREATE_LOCATIONS};" in dump
+
+
+def denied(view: str) -> mysql.connector.Error:
+    """What the server answers without the SHOW VIEW privilege."""
+    return mysql.connector.errors.ProgrammingError(
+        f"SHOW VIEW command denied to user 'leistungs_user'@'somewhere' "
+        f"for table `leistungs_db`.`{view}`",
+        errno=1142,
+    )
+
+
+def test_a_denied_view_does_not_cost_the_backup(real_db):
+    real_db.mydb.cursor_stub.deny_views = {"leistungs_view"}
+
+    dump = real_db.dump()
+
+    # the data is still all there
+    assert "INSERT INTO `locations`" in dump
+    assert f"{CREATE_LOCATIONS};" in dump
+    # and the view is accounted for rather than silently missing
+    assert "-- view `leistungs_view` could not be dumped" in dump
+    assert "CREATE VIEW `leistungs_view`" not in dump
+
+
+def test_a_denied_view_marks_the_dump_incomplete(real_db):
+    real_db.mydb.cursor_stub.deny_views = {"leistungs_view"}
+
+    dump = real_db.dump()
+
+    assert DUMP_INCOMPLETE in dump
+    header = dump.split("SET NAMES")[0]
+    assert (
+        DUMP_INCOMPLETE in header
+    ), "the warning has to be visible at the top"
+    assert "SHOW VIEW command denied" in header
+
+
+def test_a_complete_dump_is_not_marked(real_db):
+    assert DUMP_INCOMPLETE not in real_db.dump()
 
 
 def test_views_lose_their_definer_and_database(real_db):

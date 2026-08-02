@@ -29,6 +29,7 @@ from telegram_bot_calendar import LSTEP
 
 from leistungsbot import leistungs_config as lc
 from leistungsbot.google_place import Places
+from leistungsbot.leistungs_db import DUMP_INCOMPLETE
 from leistungsbot.leistungs_db import LeistungsDB
 from leistungsbot.leistungs_returns import LeistungsReturnCodes
 
@@ -430,16 +431,24 @@ class Helper:
         @returns The name the dump was sent under
         """
         name = self.backup_filename()
+        dump = self.db.dump()
+        caption = "Do host dei Backup. Pass guat drauf auf!"
+        if DUMP_INCOMPLETE in dump:
+            caption = (
+                "Do host dei Backup, ober es is NED vollständig - "
+                "schau eini, ganz oben steht wos föhlt."
+            )
+
         path = os.path.join(self.temp_dir, name)
         with open(path, "w", encoding="utf-8") as handle:
-            handle.write(self.db.dump())
+            handle.write(dump)
         try:
             with open(path, "rb") as handle:
                 self.bot.send_document(
                     chat_id,
                     handle,
                     visible_file_name=name,
-                    caption="Do host dei Backup. Pass guat drauf auf!",
+                    caption=caption,
                     disable_notification=True,
                 )
         finally:

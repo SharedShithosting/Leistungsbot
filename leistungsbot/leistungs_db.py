@@ -23,6 +23,11 @@ from leistungsbot.google_place import Places
 from leistungsbot.leistungs_returns import LeistungsReturnCodes
 
 
+# Written into a dump that could not be produced in full, and checked for by
+# the code that hands the dump to the user.
+DUMP_INCOMPLETE = "-- WARNING: this dump is incomplete"
+
+
 class LeistungsTagState(Enum):
     NONE = 0
     OPEN = 1
@@ -771,10 +776,8 @@ class LeistungsDB:
         # fetchone and the connection would otherwise refuse the next query
         cursor = self.mydb.cursor(buffered=True)
 
+        warnings: list[str] = []
         lines = [
-            "-- LeistungsBot database dump",
-            f"-- created {datetime.now().isoformat(timespec='seconds')}",
-            "",
             "SET NAMES utf8mb4;",
             "SET FOREIGN_KEY_CHECKS = 0;",
             "",
@@ -802,8 +805,18 @@ class LeistungsDB:
             lines.append("")
 
         for view in views:
-            cursor.execute(f"SHOW CREATE VIEW `{view}`;")
-            create = cursor.fetchone()[1]
+            # `SHOW CREATE VIEW` needs the SHOW VIEW privilege, which the bot
+            # user does not necessarily have. The data is the part that cannot
+            # be reconstructed, so a missing view definition must not cost the
+            # whole backup - note it and carry on.
+            try:
+                cursor.execute(f"SHOW CREATE VIEW `{view}`;")
+                create = cursor.fetchone()[1]
+            except mysql.connector.Error as error:
+                logging.warning("could not dump view %s: %s", view, error)
+                warnings.append(f"view `{view}` is missing: {error}")
+                lines += [f"-- view `{view}` could not be dumped", ""]
+                continue
             lines += [
                 f"DROP VIEW IF EXISTS `{view}`;",
                 f"{self.portableView(create)};",
@@ -811,7 +824,16 @@ class LeistungsDB:
             ]
 
         lines += ["SET FOREIGN_KEY_CHECKS = 1;", ""]
-        return "\n".join(lines)
+
+        header = [
+            "-- LeistungsBot database dump",
+            f"-- created {datetime.now().isoformat(timespec='seconds')}",
+        ]
+        if warnings:
+            header += [DUMP_INCOMPLETE] + [f"-- {w}" for w in warnings]
+        header += [""]
+
+        return "\n".join(header + lines)
 
     def switchLeistungstagLocation(
         self,
