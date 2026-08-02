@@ -1,37 +1,37 @@
-version: "3.9"
 services:
   leistungsbot:
     build: .
+    restart: always
     volumes:
       - ./BotConfig.yml:/config/BotConfig.yml:ro
-    links:
-      - "db:mysql"
-    depends_on:
-      - db
-  db:
-    image: mariadb:latest
-    restart: always
-    hostname: mysql
+      - leistungsdata:/data
+  # What phpMyAdmin used to be, now that the database is a file.
+  #
+  #   docker compose --profile dev up
+  #   https://localhost:3001   (3000 is plain http and has to be proxied)
+  #
+  # Only in the `dev` profile, so a plain `docker compose up` does not start
+  # it. Bound to 127.0.0.1 on purpose: the image ships a whole desktop with a
+  # terminal that has passwordless sudo, so whoever reaches this port owns the
+  # container. Do not publish it.
+  sqlitebrowser:
+    image: lscr.io/linuxserver/sqlitebrowser:latest
+    profiles: ["dev"]
+    restart: unless-stopped
     environment:
-      MYSQL_DATABASE: "leistungs_db"
-      # So you don't have to use root, but you can if you like
-      MYSQL_USER: "leistungs_user"
-      # You can use whatever password you like
-      MYSQL_PASSWORD: "RealyStrongPassword"
-      # Password for root access
-      MYSQL_ROOT_PASSWORD: "password"
-      # Where our data will be persisted
-    ports:
-      - 3306:3306
+      # root, because the bot container writes the database as root and the
+      # browser has to be able to open it read-write
+      - PUID=0
+      - PGID=0
+      - TZ=Europe/Vienna
     volumes:
-      - ./example_db:/var/lib/mysql
-  phpmyadmin:
-    image: beeyev/phpmyadmin-lightweight:latest
-    restart: always
+      - sqlitebrowserconfig:/config
+      # the database shows up as /data/leistungs_db.sqlite
+      - leistungsdata:/data
     ports:
-      - 8080:80
-    depends_on:
-      - db
-    environment:
-      - PMA_HOST=db
-      - PMA_PORT=3306
+      - 127.0.0.1:3000:3000
+      - 127.0.0.1:3001:3001
+    shm_size: "1gb"
+volumes:
+  leistungsdata:
+  sqlitebrowserconfig:

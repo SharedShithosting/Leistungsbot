@@ -4,27 +4,40 @@
 #  can do whatever you want with this stuff. If we meet some day, and you think
 #  this stuff is worth it, you can buy me a beer in return Poul-Henning Kamp  #
 # #############################################################################
+"""The database, on SQLite.
+
+One file, no server. The method names and return shapes are the ones the
+rest of the bot already expects, so this is a swap of the storage engine and
+not of the interface.
+
+Two SQLite specifics worth knowing:
+
+* dates are stored as ISO strings and read back as `datetime.date` /
+  `datetime.datetime` by :meth:`LeistungsDB.convert`, because the callers do
+  arithmetic and `strftime` on them
+* foreign keys are off by default and have to be switched on per connection
+"""
 from __future__ import annotations
 
 import logging
 import re
+import sqlite3
 from datetime import date
 from datetime import datetime
-from datetime import time
-from datetime import timedelta
-from decimal import Decimal
 from enum import Enum
-
-import mysql.connector
-from mysql.connector.conversion import MySQLConverter
+from pathlib import Path
 
 from leistungsbot import leistungs_config as lc
 from leistungsbot.google_place import Places
 from leistungsbot.leistungs_returns import LeistungsReturnCodes
 
-# Written into a dump that could not be produced in full, and checked for by
-# the code that hands the dump to the user.
-DUMP_INCOMPLETE = "-- WARNING: this dump is incomplete"
+SCHEMA = Path(__file__).parent / "schema.sql"
+
+DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+TIMESTAMP = re.compile(r"\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d+)?")
+
+sqlite3.register_adapter(date, lambda value: value.isoformat())
+sqlite3.register_adapter(datetime, lambda value: value.isoformat(sep=" "))
 
 
 class LeistungsTagState(Enum):
@@ -36,402 +49,300 @@ class LeistungsTagState(Enum):
 class LeistungsDB:
     def __init__(self):
         self.google = Places()
-        self.converter = MySQLConverter()
+        self.mydb = None
         self.connect()
 
-    def connect(self):
+    # ────────────────────────────── connection ──────────────────────────────
+
+    def path(self) -> Path:
+        return Path(lc.config["sqlite"]["path"]).expanduser()
+
+    def connect(self) -> bool:
+        """! Opens the database, creating it from schema.sql if it is new"""
         try:
-            self.mydb = mysql.connector.connect(
-                host=lc.config["mysql"]["host"],
-                database=lc.config["mysql"]["db"],
-                user=lc.config["mysql"]["user"],
-                password=lc.config["mysql"]["password"],
-                ssl_disabled=True,
-                collation="utf8mb4_general_ci",
-            )
+            path = self.path()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            self.mydb = sqlite3.connect(path, isolation_level=None)
+            self.mydb.execute("PRAGMA foreign_keys = ON;")
+            self.mydb.execute("PRAGMA journal_mode = WAL;")
+            self.mydb.executescript(SCHEMA.read_text())
             return True
         except Exception as e:
-            self.mydb = mysql.connector.MySQLConnection()
-            logging.error("Error while connecting to MySQL: %s", e)
+            self.mydb = None
+            logging.error("Error while opening the database: %s", e)
             return False
 
-    def convert(self, mysql_res, skinny_bitch=False):
-        if not mysql_res:
-            return None
+    def is_connected(self) -> bool:
+        if self.mydb is None:
+            return False
+        try:
+            self.mydb.execute("SELECT 1;")
+            return True
+        except sqlite3.Error:
+            return False
 
-        elif isinstance(mysql_res, dict):
-            for k in mysql_res:
-                mysql_res[k] = self.convert(mysql_res[k], skinny_bitch)
+    def cursor(self, dictionary: bool = False) -> sqlite3.Cursor:
+        """! A cursor on a live connection
 
-        elif type(mysql_res) in [tuple, list]:
-            mysql_res = [self.convert(i, skinny_bitch) for i in mysql_res]
+        Reconnects once if the connection went away, which is what every
+        method used to do by hand.
+        """
+        if not self.is_connected():
+            if not self.connect():
+                logging.error("No connection to DataBase possible")
+                raise Exception("No connection to DataBase available")
+        self.mydb.row_factory = sqlite3.Row if dictionary else None
+        return self.mydb.cursor()
 
-            if skinny_bitch and len(mysql_res) == 1:
-                return mysql_res[0]
+    def checkConnection(self) -> bool:
+        if self.is_connected():
+            print("Connected to SQLite version ", sqlite3.sqlite_version)
+            print("You're using database: ", self.path())
+        return self.is_connected()
 
-        elif isinstance(mysql_res, bytearray):
-            pass
+    def commit(self) -> None:
+        # isolation_level=None means autocommit; kept so the call sites that
+        # used to commit explicitly still read the same.
+        pass
 
-        elif isinstance(mysql_res, str):
-            if "POINT" in mysql_res:
-                return re.findall(r"[\d\.]+", mysql_res)
+    # ─────────────────────────────── conversion ─────────────────────────────
 
-        return mysql_res
+    def convert(self, res, skinny_bitch=False):
+        """! Normalises what SQLite hands back
 
-    def checkConnection(self):
-        if self.mydb.is_connected():
-            db_Info = self.mydb.get_server_info()
-            print("Connected to MySQL Server version ", db_Info)
-            cursor = self.mydb.cursor()
-            cursor.execute("select database();")
-            record = cursor.fetchone()
-            print("You're connected to database: ", record)
-        return self.mydb.is_connected()
+        Rows become dicts or lists, and the ISO strings that dates are stored
+        as become `date` / `datetime` again. `skinny_bitch` unwraps a
+        one-element result, which is how the single value getters read.
+        """
+        if isinstance(res, sqlite3.Row):
+            return {k: self.convert(res[k], skinny_bitch) for k in res.keys()}
+
+        if not res:
+            return None if res is None or res == [] or res == () else res
+
+        if isinstance(res, dict):
+            return {k: self.convert(v, skinny_bitch) for k, v in res.items()}
+
+        if isinstance(res, (tuple, list)):
+            res = [self.convert(i, skinny_bitch) for i in res]
+            if skinny_bitch and len(res) == 1:
+                return res[0]
+            return res
+
+        if isinstance(res, str):
+            if TIMESTAMP.fullmatch(res):
+                return datetime.fromisoformat(res)
+            if DATE.fullmatch(res):
+                return date.fromisoformat(res)
+
+        return res
+
+    # ──────────────────────────────── members ───────────────────────────────
 
     def addUser(self, user_id: int, chat_id: int = None):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor()
+        cursor = self.cursor()
         try:
-            sql = """INSERT INTO `members` (`user_id`, `chat_id`, `score`, `joined`)
-                VALUES (%s, %s, %s, %s);"""
-            values = (
-                user_id,
-                chat_id,
-                0,
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            )
-            logging.debug(sql % values)
-            cursor.execute(sql, values)
-        except mysql.connector.IntegrityError:
             cursor.execute(
-                "UPDATE `members` SET `left` = %s, `chat_id` = %s WHERE `user_id` = %s;",
+                'INSERT INTO "members" ("user_id", "chat_id", "score", '
+                '"joined") VALUES (?, ?, ?, ?);',
+                (user_id, chat_id, 0, datetime.now()),
+            )
+        except sqlite3.IntegrityError:
+            cursor.execute(
+                'UPDATE "members" SET "left" = ?, "chat_id" = ? '
+                'WHERE "user_id" = ?;',
                 (None, chat_id, user_id),
             )
-        self.mydb.commit()
 
     def getUsers(self):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor()
-        sql = "SELECT * FROM `members`;"
-        values = ()
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
+        cursor = self.cursor()
+        cursor.execute('SELECT * FROM "members";')
         return self.convert(cursor.fetchall())
 
     def getUserKey(self, user_id):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor()
-        sql = "SELECT `key` FROM `members` WHERE `user_id` = %s;"
-        values = (user_id,)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
+        cursor = self.cursor()
+        cursor.execute(
+            'SELECT "key" FROM "members" WHERE "user_id" = ?;',
+            (user_id,),
+        )
         return self.convert(cursor.fetchone(), True)
 
     def getUserScore(self, user_id: int):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor()
-        sql = "SELECT `score` FROM `members` WHERE `user_id` = %s;"
-        values = (user_id,)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
+        cursor = self.cursor()
+        cursor.execute(
+            'SELECT "score" FROM "members" WHERE "user_id" = ?;',
+            (user_id,),
+        )
         return self.convert(cursor.fetchone(), True)
 
     def setUserScore(self, user_id: int, score: int):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor()
-        sql = "UPDATE `members` SET `score` = 'NULL', chat_id = %s WHERE `user_id` = %s;"
-        values = (score, user_id)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
-        self.mydb.commit()
+        cursor = self.cursor()
+        cursor.execute(
+            'UPDATE "members" SET "score" = ? WHERE "user_id" = ?;',
+            (score, user_id),
+        )
 
     def increaseUserScore(self, user_id: int, value: int):
         self.setUserScore(user_id, self.getUserScore(user_id) + value)
 
     def removeUser(self, user_id: int):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
+        cursor = self.cursor()
+        cursor.execute(
+            'UPDATE "members" SET "left" = ? WHERE "user_id" = ?;',
+            (datetime.now(), user_id),
+        )
 
-        cursor = self.mydb.cursor()
-        sql = "UPDATE `members` SET `left` = %s WHERE `user_id` = %s;"
-        # .strftime('%Y-%m-%d %H:%M:%S')
-        values = (datetime.now(), user_id)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
-        self.mydb.commit()
+    # ─────────────────────────────── locations ──────────────────────────────
 
     def addLocation(self, place_id: str, name: str) -> LeistungsReturnCodes:
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
         info = self.google.getPlaceInfo(place_id)
-        cursor = self.mydb.cursor()
+        cursor = self.cursor()
         retry = True
         orig_name = name
         cnt = 1
         res = LeistungsReturnCodes.OK
         while retry:
             try:
-                sql = "INSERT INTO `locations` (`name`, `google-place-id`, `lat`, `lng`, `address`, `phone`, `url`) VALUES (%s, %s, %s, %s, %s, %s, %s);"
-                values = (
-                    name,
-                    place_id,
-                    info.get("geometry", {})
-                    .get("location", {})
-                    .get("lat", None),
-                    info.get("geometry", {})
-                    .get(
-                        "location",
-                        {},
-                    )
-                    .get("lng", None),
-                    info.get("formatted_address", None),
-                    info.get("international_phone_number", None),
-                    info.get("url", None),
+                cursor.execute(
+                    'INSERT INTO "locations" ("name", "google-place-id", '
+                    '"lat", "lng", "address", "phone", "url") '
+                    "VALUES (?, ?, ?, ?, ?, ?, ?);",
+                    (
+                        name,
+                        place_id,
+                        info.get("geometry", {})
+                        .get("location", {})
+                        .get("lat", None),
+                        info.get("geometry", {})
+                        .get("location", {})
+                        .get("lng", None),
+                        info.get("formatted_address", None),
+                        info.get("international_phone_number", None),
+                        info.get("url", None),
+                    ),
                 )
-                logging.debug(sql % values)
-                cursor.execute(sql, values)
                 retry = False
-            except mysql.connector.IntegrityError:
+            except sqlite3.IntegrityError:
                 location = self.getLocationInfo(name)
-                if location.get("google-place-id") == place_id:
+                if location and location.get("google-place-id") == place_id:
                     retry = False
                     res = LeistungsReturnCodes.DB_DUPLICATE
                 else:
                     cnt += 1
                     name = orig_name + str(cnt)
-        self.mydb.commit()
         return res
 
     def removeLocation(self, key):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor()
-        sql = "DELETE FROM `locations` WHERE `key` = %s;"
-        values = (key,)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
-        self.mydb.commit()
+        cursor = self.cursor()
+        cursor.execute('DELETE FROM "locations" WHERE "key" = ?;', (key,))
 
     def getAllLocations(self):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor()
-        sql = "SELECT `name` FROM `locations`;"
-        values = ()
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
+        cursor = self.cursor()
+        cursor.execute('SELECT "name" FROM "locations";')
         return self.convert(cursor.fetchall())
 
     def getLocationKey(self, location_name):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor()
-        sql = "SELECT `key` FROM `locations` WHERE `name` = %s;"
-        values = (location_name,)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
+        cursor = self.cursor()
+        cursor.execute(
+            'SELECT "key" FROM "locations" WHERE "name" = ?;',
+            (location_name,),
+        )
         return self.convert(cursor.fetchone(), True)
 
     def getLocationName(self, location_key):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor()
-        sql = "SELECT `name` FROM `locations` WHERE `key` = %s;"
-        values = (location_key,)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
+        cursor = self.cursor()
+        cursor.execute(
+            'SELECT "name" FROM "locations" WHERE "key" = ?;',
+            (location_key,),
+        )
         return self.convert(cursor.fetchone(), True)
 
     def getVisitedLocations(self):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor()
-        sql = "SELECT `name`, `key` FROM `locations` WHERE `visited` = TRUE;"
-        values = ()
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
+        cursor = self.cursor()
+        cursor.execute(
+            'SELECT "name", "key" FROM "locations" WHERE "visited" = 1;',
+        )
         return self.convert(cursor.fetchall())
 
     def getVirgineLocations(self):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor()
-        sql = "SELECT `name`, `key` FROM `locations` WHERE `visited` = FALSE ORDER BY `name` DESC;"
-        values = ()
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
+        cursor = self.cursor()
+        cursor.execute(
+            'SELECT "name", "key" FROM "locations" WHERE "visited" = 0 '
+            'ORDER BY "name" DESC;',
+        )
         return self.convert(cursor.fetchall())
 
     def getLocationInfo(self, location_name):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor(dictionary=True)
-        sql = "SELECT * FROM `locations` WHERE `name` = %s;"
-        values = (location_name,)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
+        cursor = self.cursor(dictionary=True)
+        cursor.execute(
+            'SELECT * FROM "locations" WHERE "name" = ?;',
+            (location_name,),
+        )
         return self.convert(cursor.fetchone(), True)
 
     def getLocationInfoByKey(self, key: int):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor(dictionary=True)
-        sql = "SELECT * FROM `locations` WHERE `key` = %s;"
-        values = (key,)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
+        cursor = self.cursor(dictionary=True)
+        cursor.execute('SELECT * FROM "locations" WHERE "key" = ?;', (key,))
         return self.convert(cursor.fetchone(), True)
 
     def setLocationVisitedState(self, location_name, visited=True):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor()
-        sql = "UPDATE `locations` SET `visited` = %s WHERE `name` = %s;"
-        values = (visited, location_name)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
-        self.mydb.commit()
+        cursor = self.cursor()
+        cursor.execute(
+            'UPDATE "locations" SET "visited" = ? WHERE "name" = ?;',
+            (int(visited), location_name),
+        )
 
     def setLocationVisitedStateKey(self, location_key, visited=True):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
+        cursor = self.cursor()
+        cursor.execute(
+            'UPDATE "locations" SET "visited" = ? WHERE "key" = ?;',
+            (int(visited), location_key),
+        )
 
-        cursor = self.mydb.cursor()
-        sql = "UPDATE `locations` SET `visited` = %s WHERE `key` = %s;"
-        values = (visited, location_key)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
-        self.mydb.commit()
+    # ──────────────────────────────── ratings ───────────────────────────────
 
     def rateLocation(self, location_name, user_id, rating):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        uKey = self.getUserKey(user_id)
-        lKey = self.getLocationKey(location_name)
-        cursor = self.mydb.cursor()
-        sql = "INSERT INTO `location_rating` (`location`, `member`, `rating`) VALUES (%s, %s, %s);"
-        values = (lKey, uKey, rating)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
-        self.mydb.commit()
+        self.rateLocationKey(
+            self.getLocationKey(location_name),
+            user_id,
+            rating,
+        )
 
     def rateLocationKey(self, location_key, user_id, rating):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        uKey = self.getUserKey(user_id)
-        lKey = location_key
-        cursor = self.mydb.cursor()
-        sql = "INSERT INTO `location_rating` (`location`, `member`, `rating`) VALUES (%s, %s, %s);"
-        values = (lKey, uKey, rating)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
-        self.mydb.commit()
+        cursor = self.cursor()
+        cursor.execute(
+            'INSERT INTO "location_rating" ("location", "member", "rating") '
+            "VALUES (?, ?, ?);",
+            (location_key, self.getUserKey(user_id), rating),
+        )
 
     def getAvgLocationRating(self, location_name):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        lKey = self.getLocationKey(location_name)
-        cursor = self.mydb.cursor()
-        sql = "SELECT AVG(`rating`) FROM `location_rating` WHERE `location` = %s;"
-        values = (lKey,)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
+        cursor = self.cursor()
+        cursor.execute(
+            'SELECT AVG("rating") FROM "location_rating" WHERE "location" = ?;',
+            (self.getLocationKey(location_name),),
+        )
         res = self.convert(cursor.fetchall(), skinny_bitch=True)
         return res if res else 0
 
     def getUserLocationRating(self, location_name, user_id):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        uKey = self.getUserKey(user_id)
-        lKey = self.getLocationKey(location_name)
-        cursor = self.mydb.cursor(dictionary=True)
-        sql = "SELECT `rating` FROM `location_rating` WHERE `location` = %s AND `member` = %s;"
-        values = (lKey, uKey)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
+        cursor = self.cursor(dictionary=True)
+        cursor.execute(
+            'SELECT "rating" FROM "location_rating" '
+            'WHERE "location" = ? AND "member" = ?;',
+            (self.getLocationKey(location_name), self.getUserKey(user_id)),
+        )
         return self.convert(cursor.fetchone(), True)
 
     def getAvgUserLocationRating(self, user_id):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        uKey = self.getUserKey(user_id)
-        cursor = self.mydb.cursor()
-        sql = (
-            "SELECT AVG(`rating`) FROM `location_rating` WHERE `member` = %s;"
+        cursor = self.cursor()
+        cursor.execute(
+            'SELECT AVG("rating") FROM "location_rating" WHERE "member" = ?;',
+            (self.getUserKey(user_id),),
         )
-        values = (uKey,)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
         return self.convert(cursor.fetchall())
+
+    # ────────────────────────────── leistungstag ────────────────────────────
 
     def addLeistungsTag(
         self,
@@ -441,154 +352,82 @@ class LeistungsDB:
         venue_id: int,
         type: int,
     ):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        lKey = self.getLocationKey(location_name)
-        cursor = self.mydb.cursor()
-        sql = "INSERT INTO `leistungstag` (`location`, `date`, `poll_id`, `venue_id`, `type`) VALUES (%s, %s, %s, %s, %s);"
-        # .strftime('%Y-%m-%d')
-        values = (lKey, date, poll_id, venue_id, type)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
-        self.mydb.commit()
+        cursor = self.cursor()
+        cursor.execute(
+            'INSERT INTO "leistungstag" ("location", "date", "poll_id", '
+            '"venue_id", "type") VALUES (?, ?, ?, ?, ?);',
+            (
+                self.getLocationKey(location_name),
+                date.date() if isinstance(date, datetime) else date,
+                poll_id,
+                venue_id,
+                int(type),
+            ),
+        )
 
     def getLeistungstag(self, key: int):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor(dictionary=True)
-        sql = "SELECT * FROM `leistungstag` WHERE `key` = %s;"
-        values = (key,)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
+        cursor = self.cursor(dictionary=True)
+        cursor.execute('SELECT * FROM "leistungstag" WHERE "key" = ?;', (key,))
         return self.convert(cursor.fetchone(), True)
 
     def getLeistungstageByDate(self, date: date):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor(dictionary=True)
-        sql = "SELECT * FROM `leistungstag` WHERE DATE(`date`) = %s;"
-        values = (date,)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
+        cursor = self.cursor(dictionary=True)
+        cursor.execute(
+            'SELECT * FROM "leistungstag" WHERE DATE("date") = ?;',
+            (date,),
+        )
         return self.convert(cursor.fetchall())
 
     def getLeistungsTagKeyPollId(self, poll_id: int):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor()
-        sql = "SELECT `key` FROM `leistungstag` WHERE `poll_id` = %s;"
-        values = (poll_id,)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
+        cursor = self.cursor()
+        cursor.execute(
+            'SELECT "key" FROM "leistungstag" WHERE "poll_id" = ?;',
+            (poll_id,),
+        )
         return self.convert(cursor.fetchone(), True)
 
     def getOpenLeistungsTag(self, type: int = None):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor(dictionary=True)
-        if type:
-            sql = "SELECT * FROM `leistungstag` WHERE `type` = %s AND `closed` = %s ORDER BY `date`;"
-            values = (int(type), False)
-        else:
-            sql = "SELECT * FROM `leistungstag` WHERE `closed` = %s ORDER BY `date`;"
-            values = (False,)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
-        return self.convert(cursor.fetchall())
+        return self.getLeistungsTags(type, LeistungsTagState.OPEN)
 
     def getClosedLeistungsTag(self, type: int = None):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor(dictionary=True)
-        if type:
-            sql = "SELECT * FROM `leistungstag` WHERE `type` = %s AND `closed` = %s ORDER BY `date`;"
-            values = (int(type), True)
-        else:
-            sql = "SELECT * FROM `leistungstag` WHERE `closed` = %s ORDER BY `date`;"
-            values = (True,)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
-        return self.convert(cursor.fetchall())
+        return self.getLeistungsTags(type, LeistungsTagState.CLOSED)
 
     def closeLeistungstag(self, leistungstag_key: int):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor()
-        sql = "UPDATE `leistungstag` SET `closed` = %s WHERE `key` = %s;"
-        values = (True, leistungstag_key)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
-        self.mydb.commit()
+        cursor = self.cursor()
+        cursor.execute(
+            'UPDATE "leistungstag" SET "closed" = 1 WHERE "key" = ?;',
+            (leistungstag_key,),
+        )
 
     def removeLeistungstag(self, key: int):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor()
-        sql = "DELETE FROM `leistungstag` WHERE `key` = %s;"
-        values = (key,)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
-        self.mydb.commit()
+        cursor = self.cursor()
+        cursor.execute('DELETE FROM "leistungstag" WHERE "key" = ?;', (key,))
 
     def getHistory(self, type: int = None, limit: int = 100):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor(dictionary=True)
-        sql = f"SELECT * FROM (SELECT * FROM `leistungstag` {'WHERE `type` = %s' if type else ''} ORDER BY `date` DESC LIMIT %s) SQ ORDER BY `date`;"
-        if type:
-            values = (int(type), int(limit))
-        else:
-            values = (int(limit),)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
+        cursor = self.cursor(dictionary=True)
+        where = 'WHERE "type" = ?' if type else ""
+        values = (int(type), int(limit)) if type else (int(limit),)
+        cursor.execute(
+            f'SELECT * FROM (SELECT * FROM "leistungstag" {where} '
+            'ORDER BY "date" DESC LIMIT ?) ORDER BY "date";',
+            values,
+        )
         return self.convert(cursor.fetchall())
 
     def getHistoryCount(self, type: int = None):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor()
+        cursor = self.cursor()
         if type:
-            sql = "SELECT COUNT(*) FROM `leistungstag` WHERE `type` = %s;"
-            values = (int(type),)
+            cursor.execute(
+                'SELECT COUNT(*) FROM "leistungstag" WHERE "type" = ?;',
+                (int(type),),
+            )
         else:
-            sql = "SELECT COUNT(*) FROM `leistungstag`;"
-            values = ()
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
+            cursor.execute('SELECT COUNT(*) FROM "leistungstag";')
         return self.convert(cursor.fetchone(), True)
 
     def getLatest(self, type: int = None, state=LeistungsTagState.NONE):
-        return self.getPrevious(type, state, 1)
+        results = self.getLeistungsTags(type, state, max_results=1)
+        return results[0] if results else None
 
     def getLeistungsTags(
         self,
@@ -597,242 +436,47 @@ class LeistungsDB:
         max_results: int = 0,
         before: datetime = None,
     ):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor(dictionary=True)
-        select = "SELECT * FROM `leistungstag`"
-        where = ""
-        values = ()
-        order = "ORDER BY `date` DESC"
+        conditions = []
+        values: tuple = ()
 
         if before:
-            if len(where) > 0:
-                where += " AND "
-            else:
-                where = "WHERE "
-            where += "`date` <= %s"
+            conditions.append('"date" <= ?')
             values += (before,)
-
         if type:
-            if len(where) > 0:
-                where += " AND "
-            else:
-                where = "WHERE "
-            where += "`type` = %s"
+            conditions.append('"type" = ?')
             values += (int(type),)
-
         if state != LeistungsTagState.NONE:
-            if len(where) > 0:
-                where += " AND "
-            else:
-                where = "WHERE "
-            where += "`closed` = %s"
-            values += (state == LeistungsTagState.CLOSED,)
+            conditions.append('"closed" = ?')
+            values += (int(state == LeistungsTagState.CLOSED),)
 
+        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         limit = ""
         if max_results > 0:
-            limit = "LIMIT %s"
+            limit = "LIMIT ?"
             values += (max_results,)
 
-        sql = f"{select} {where} {order} {limit};"
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
+        cursor = self.cursor(dictionary=True)
+        cursor.execute(
+            f'SELECT * FROM "leistungstag" {where} ORDER BY "date" DESC '
+            f"{limit};",
+            values,
+        )
         return self.convert(cursor.fetchall())
-
-    def getParticipants(self, leistungstag_key: int):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor()
-        sql = "SELECT `member` FROM `participants` WHERE `event` = %s;"
-        values = (leistungstag_key,)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
-        return self.convert(cursor.fetchall())
-
-    def getLatestParticipants(self, type=None):
-        key = self.getLatest(type).get("key")
-        return self.getParticipants(key)
-
-    def addParticipant(self, user_id: int, poll_id: int):
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        user_key = self.getUserKey(user_id)
-        leistungstag_key = self.getLeistungsTagKeyPollId(poll_id)
-        cursor = self.mydb.cursor()
-        sql = "INSERT INTO `participants` (`member`, `event`) VALUES (%s, %s);"
-        values = (user_key, leistungstag_key)
-        logging.debug(sql % values)
-        cursor.execute(sql, values)
-        self.mydb.commit()
 
     def getMostRecentLeistungstag(self) -> dict:
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor(dictionary=True)
-        sql = "SELECT * FROM `leistungstag` ORDER BY `date` DESC LIMIT 1"
-        cursor.execute(sql)
+        cursor = self.cursor(dictionary=True)
+        cursor.execute(
+            'SELECT * FROM "leistungstag" ORDER BY "date" DESC LIMIT 1;',
+        )
         return self.convert(cursor.fetchone(), True)
 
     def getLeistungstagByNumber(self, number: int) -> dict | None:
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor(dictionary=True)
-        sql = "SELECT * FROM `leistungs_view` WHERE number = %s"
-        cursor.execute(sql, (number,))
+        cursor = self.cursor(dictionary=True)
+        cursor.execute(
+            'SELECT * FROM "leistungs_view" WHERE "number" = ?;',
+            (number,),
+        )
         return self.convert(cursor.fetchone(), True)
-
-    def getTables(self) -> tuple[list[str], list[str]]:
-        """! Names of everything in the current database
-
-        @returns Base table names and view names, each sorted by name
-        """
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        cursor = self.mydb.cursor()
-        sql = "SHOW FULL TABLES;"
-        logging.debug(sql)
-        cursor.execute(sql)
-        tables = []
-        views = []
-        for name, table_type in cursor.fetchall():
-            if table_type == "VIEW":
-                views.append(name)
-            else:
-                tables.append(name)
-        return sorted(tables), sorted(views)
-
-    def sqlLiteral(self, value) -> str:
-        """! Renders a python value as a SQL literal for the dump"""
-        if value is None:
-            return "NULL"
-        if isinstance(value, bool):
-            return "1" if value else "0"
-        if isinstance(value, (int, float, Decimal)):
-            return str(value)
-        if isinstance(value, (bytes, bytearray)):
-            # `bit` columns arrive as bytes, a hex literal round trips them
-            return f"0x{bytes(value).hex()}" if value else "''"
-        if isinstance(value, timedelta):
-            return f"'{value}'"
-        if isinstance(value, datetime):
-            return f"'{value.isoformat(sep=' ')}'"
-        if isinstance(value, (date, time)):
-            return f"'{value.isoformat()}'"
-        return f"'{self.converter.escape(str(value))}'"
-
-    def portableView(self, create: str) -> str:
-        """! Makes a `SHOW CREATE VIEW` statement restorable anywhere
-
-        The server qualifies every table in the definition with the database
-        it was dumped from and pins the definer to a user account. Restored
-        as is, the view of a dump would read from the *original* database
-        instead of the restored one, and would fail outright on a machine
-        where that user does not exist.
-
-        @param create The statement as `SHOW CREATE VIEW` returns it
-
-        @returns The same statement without definer and database qualifier
-        """
-        create = re.sub(r"DEFINER=\S+@\S+\s+", "", create)
-        database = lc.config["mysql"]["db"]
-        if database:
-            create = create.replace(f"`{database}`.", "")
-        return create
-
-    def dump(self) -> str:
-        """! Dumps the whole database as SQL
-
-        Structure and contents of every base table plus the definition of
-        every view, in an order that can be replayed into an empty database.
-
-        @returns The dump as a single SQL script
-        """
-        if not self.mydb.is_connected():
-            if not self.connect():
-                logging.error("No connection to DataBase possible")
-                raise Exception("No connection to DataBase available")
-
-        tables, views = self.getTables()
-        # buffered, because the `SHOW CREATE ...` result sets are read with
-        # fetchone and the connection would otherwise refuse the next query
-        cursor = self.mydb.cursor(buffered=True)
-
-        warnings: list[str] = []
-        lines = [
-            "SET NAMES utf8mb4;",
-            "SET FOREIGN_KEY_CHECKS = 0;",
-            "",
-        ]
-
-        for table in tables:
-            cursor.execute(f"SHOW CREATE TABLE `{table}`;")
-            create = cursor.fetchone()[1]
-            lines += [
-                f"DROP TABLE IF EXISTS `{table}`;",
-                f"{create};",
-                "",
-            ]
-
-            cursor.execute(f"SELECT * FROM `{table}`;")
-            rows = cursor.fetchall()
-            if not rows:
-                continue
-            columns = ", ".join(f"`{c[0]}`" for c in cursor.description)
-            for row in rows:
-                values = ", ".join(self.sqlLiteral(v) for v in row)
-                lines.append(
-                    f"INSERT INTO `{table}` ({columns}) VALUES ({values});",
-                )
-            lines.append("")
-
-        for view in views:
-            # `SHOW CREATE VIEW` needs the SHOW VIEW privilege, which the bot
-            # user does not necessarily have. The data is the part that cannot
-            # be reconstructed, so a missing view definition must not cost the
-            # whole backup - note it and carry on.
-            try:
-                cursor.execute(f"SHOW CREATE VIEW `{view}`;")
-                create = cursor.fetchone()[1]
-            except mysql.connector.Error as error:
-                logging.warning("could not dump view %s: %s", view, error)
-                warnings.append(f"view `{view}` is missing: {error}")
-                lines += [f"-- view `{view}` could not be dumped", ""]
-                continue
-            lines += [
-                f"DROP VIEW IF EXISTS `{view}`;",
-                f"{self.portableView(create)};",
-                "",
-            ]
-
-        lines += ["SET FOREIGN_KEY_CHECKS = 1;", ""]
-
-        header = [
-            "-- LeistungsBot database dump",
-            f"-- created {datetime.now().isoformat(timespec='seconds')}",
-        ]
-        if warnings:
-            header += [DUMP_INCOMPLETE] + [f"-- {w}" for w in warnings]
-        header += [""]
-
-        return "\n".join(header + lines)
 
     def switchLeistungstagLocation(
         self,
@@ -840,33 +484,108 @@ class LeistungsDB:
         old_location_id: int,
         new_location_id: int,
     ) -> None:
-        if not self.mydb.is_connected():
+        cursor = self.cursor()
+        cursor.execute(
+            'UPDATE "leistungstag" SET "location" = ? WHERE "key" = ?;',
+            (new_location_id, lt_id),
+        )
+        cursor.execute(
+            'UPDATE "locations" SET "visited" = '
+            '(SELECT COUNT(*) > 0 FROM "leistungstag" WHERE "location" = ?) '
+            'WHERE "key" = ?;',
+            (old_location_id, old_location_id),
+        )
+        cursor.execute(
+            'UPDATE "locations" SET "visited" = 1 WHERE "key" = ?;',
+            (new_location_id,),
+        )
+
+    # ────────────────────────────── participants ────────────────────────────
+
+    def getParticipants(self, leistungstag_key: int):
+        cursor = self.cursor()
+        cursor.execute(
+            'SELECT "member" FROM "participants" WHERE "event" = ?;',
+            (leistungstag_key,),
+        )
+        return self.convert(cursor.fetchall())
+
+    def getLatestParticipants(self, type=None):
+        latest = self.getLatest(type)
+        return self.getParticipants(latest["key"]) if latest else None
+
+    def addParticipant(self, user_id: int, poll_id: int):
+        cursor = self.cursor()
+        cursor.execute(
+            'INSERT INTO "participants" ("member", "event") VALUES (?, ?);',
+            (
+                self.getUserKey(user_id),
+                self.getLeistungsTagKeyPollId(poll_id),
+            ),
+        )
+
+    # ──────────────────────────────── backup ────────────────────────────────
+
+    def getTables(self) -> tuple[list[str], list[str]]:
+        """! Base table names and view names, each sorted by name"""
+        cursor = self.cursor()
+        cursor.execute(
+            "SELECT name, type FROM sqlite_master "
+            "WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' "
+            "ORDER BY name;",
+        )
+        tables = []
+        views = []
+        for name, kind in cursor.fetchall():
+            (views if kind == "view" else tables).append(name)
+        return tables, views
+
+    def dump(self) -> str:
+        """! The whole database as a SQL script
+
+        `iterdump` walks structure and contents in an order that replays into
+        an empty database, so unlike the MariaDB version there is nothing to
+        assemble by hand and no privilege that can make it incomplete.
+
+        @returns The dump as a single SQL script
+        """
+        if not self.is_connected():
             if not self.connect():
-                logging.error("No connection to DataBase possible")
                 raise Exception("No connection to DataBase available")
 
-        cursor = self.mydb.cursor()
-        update_lt_sql = (
-            "UPDATE `leistungstag` SET `location` = '%s' WHERE `key` = '%s'"
-        )
-        update_old_location = "UPDATE `locations` as l SET `visited` = (SELECT count(*) FROM leistungstag WHERE location = l.`key` LIMIT 1) WHERE `key` = '%s'"
-        update_new_location = (
-            "UPDATE `locations` as l SET `visited` = 1 WHERE `key` = '%s'"
-        )
+        lines = [
+            "-- LeistungsBot database dump",
+            f"-- created {datetime.now().isoformat(timespec='seconds')}",
+            f"-- sqlite {sqlite3.sqlite_version}",
+            "",
+        ]
+        lines += list(self.mydb.iterdump())
+        lines.append("")
+        return "\n".join(lines)
 
-        cursor.execute(update_lt_sql, (new_location_id, lt_id))
-        cursor.execute(update_old_location, (old_location_id,))
-        cursor.execute(update_new_location, (new_location_id,))
-        self.mydb.commit()
+    def snapshot(self, target: Path) -> Path:
+        """! Writes a consistent copy of the database to `target`
+
+        `VACUUM INTO` takes the copy inside a transaction, so it is safe to
+        run while the bot is working, and the result is a plain database file
+        that can be opened directly.
+
+        @param target Where to write the copy, must not exist yet
+
+        @returns The path that was written
+        """
+        if not self.is_connected():
+            if not self.connect():
+                raise Exception("No connection to DataBase available")
+
+        target = Path(target)
+        target.unlink(missing_ok=True)
+        self.mydb.execute("VACUUM INTO ?;", (str(target),))
+        return target
 
 
 if __name__ == "__main__":
     logging.basicConfig(filename="myapp.log", level=logging.DEBUG)
     db = LeistungsDB()
     db.checkConnection()
-    # db.addUser(4711)
-    # db.addLocation('ChIJ5UvV55IHbUcRMq6el31MzZI', 'Cafe Phönixhof')
-    # db.addLeistungsTag(datetime.now(), 'Cafe Phönixhof', 42069)
-    # db.addParticipant(4711, 42069)
-    a = db.getOpenLeistungsTag()
-    print(a)
+    print(db.getOpenLeistungsTag())

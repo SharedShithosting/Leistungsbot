@@ -11,7 +11,6 @@ stale chat id in the configuration made the reporter itself throw and the
 original cause was lost - which is exactly how a /backup failure showed up
 as "group chat was upgraded to a supergroup chat".
 """
-
 from __future__ import annotations
 
 from telebot.apihelper import ApiTelegramException
@@ -114,7 +113,7 @@ def test_migrated_chat_id_only_fires_for_migrations(app):
 
 def test_a_failing_command_reports_once(app, db):
     """End to end: the /backup handler routes through the reporter."""
-    db.dump.side_effect = RuntimeError("no connection to the database")
+    db.snapshot.side_effect = RuntimeError("no connection to the database")
 
     support.send_command(app, "/backup")
 

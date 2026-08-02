@@ -1,8 +1,5 @@
-mysql:
-  host: '10.1.1.111'
-  db: 'leistungs_db'
-  user: 'leistungs_user'
-  password: 'RealyStrongPassword'
+sqlite:
+  path: "/data/leistungs_db.sqlite"
 google: '---Your-API-Key'
 bot_token: '1234567:ASDF234567ASDFG'  # YOUR BOT TOKEN HERE GET FROM @BotFather
 api_hash: '345678987654323456'  # YOUR API HASH GET FROM my.telegram.org
@@ -12,3 +9,4 @@ leistungschat_id: '-1234567890'
 leistungsadmin_id: '-1234567890'
 usernames:
   - 'MyCoolName'  # YOUR USERNAME THIS IS MANDTORY
+backupchat_id: "your-backup-channel-id"

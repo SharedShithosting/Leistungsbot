@@ -104,7 +104,7 @@ class LeistungsBot:
         self.bot = bot = telebot.TeleBot(lc.config["bot_token"])
         self.bot.add_custom_filter(custom_filters.StateFilter(self.bot))
         self.helper = Helper(self.bot)
-        self.scheduler = Scheduler(self.bot)
+        self.scheduler = Scheduler(self.bot, self.helper)
         self.poller = None
         self.last_text_nudes = datetime.min
         self.user_context: dict[int, UserContext] = {}
@@ -1325,24 +1325,9 @@ def main():
         help="chat id from the admin group",
     )
     parser.add_argument(
-        "--host",
-        dest="mysql.host",
-        help="host name/ip from the mysql server",
-    )
-    parser.add_argument(
         "--db",
-        dest="mysql.db",
-        help="databse name",
-    )
-    parser.add_argument(
-        "--user",
-        dest="mysql.user",
-        help="user with access to the databse",
-    )
-    parser.add_argument(
-        "--password",
-        dest="mysql.password",
-        help="user password",
+        dest="sqlite.path",
+        help="path to the sqlite database file",
     )
     parser.add_argument("--config", "-c", help="Provide a custom config file")
 

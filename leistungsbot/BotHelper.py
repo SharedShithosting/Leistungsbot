@@ -17,6 +17,7 @@ from datetime import datetime
 from datetime import time
 from datetime import timedelta
 from enum import IntEnum
+from pathlib import Path
 
 import telebot
 from telebot.apihelper import ApiTelegramException
@@ -29,7 +30,6 @@ from telegram_bot_calendar import LSTEP
 
 from leistungsbot import leistungs_config as lc
 from leistungsbot.google_place import Places
-from leistungsbot.leistungs_db import DUMP_INCOMPLETE
 from leistungsbot.leistungs_db import LeistungsDB
 from leistungsbot.leistungs_returns import LeistungsReturnCodes
 
@@ -421,38 +421,35 @@ class Helper:
 
     def backup_filename(self, now: datetime = None) -> str:
         now = now if now else datetime.now()
-        return f"leistungsbot-backup-{now.strftime('%Y%m%d-%H%M%S')}.sql"
+        return f"leistungsbot-backup-{now.strftime('%Y%m%d-%H%M%S')}.sqlite"
 
     def send_backup(self, chat_id) -> str:
-        """! Dumps the database and sends it as a document
+        """! Sends a copy of the database as a document
 
-        @param chat_id Chat that gets the dump
+        A snapshot rather than a SQL dump: it is taken with `VACUUM INTO`,
+        so it is consistent even while the bot keeps working, and it can be
+        opened directly instead of having to be replayed.
 
-        @returns The name the dump was sent under
+        @param chat_id Chat that gets the backup
+
+        @returns The name the backup was sent under
         """
         name = self.backup_filename()
-        dump = self.db.dump()
-        caption = "Do host dei Backup. Pass guat drauf auf!"
-        if DUMP_INCOMPLETE in dump:
-            caption = (
-                "Do host dei Backup, ober es is NED vollständig - "
-                "schau eini, ganz oben steht wos föhlt."
-            )
-
-        path = os.path.join(self.temp_dir, name)
-        with open(path, "w", encoding="utf-8") as handle:
-            handle.write(dump)
+        path = Path(self.temp_dir) / name
+        self.db.snapshot(path)
         try:
             with open(path, "rb") as handle:
                 self.bot.send_document(
                     chat_id,
                     handle,
                     visible_file_name=name,
-                    caption=caption,
+                    caption="Do host dei Backup. Pass guat drauf auf!",
                     disable_notification=True,
                 )
         finally:
-            os.remove(path)
+            # missing_ok, so a failed snapshot reports its own error rather
+            # than being replaced by a FileNotFoundError from the cleanup
+            path.unlink(missing_ok=True)
         return name
 
     def remove_location(self, locationname):
