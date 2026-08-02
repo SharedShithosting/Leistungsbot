@@ -10,6 +10,7 @@ With SQLite there is no server to reach, so these are ordinary unit tests
 that run everywhere - the whole file used to need a MariaDB and was skipped
 almost everywhere it ran.
 """
+
 from __future__ import annotations
 
 from datetime import date

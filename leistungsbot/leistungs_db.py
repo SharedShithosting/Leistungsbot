@@ -17,6 +17,7 @@ Two SQLite specifics worth knowing:
   arithmetic and `strftime` on them
 * foreign keys are off by default and have to be switched on per connection
 """
+
 from __future__ import annotations
 
 import logging
