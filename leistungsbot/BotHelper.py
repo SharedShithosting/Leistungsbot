@@ -28,6 +28,7 @@ from telebot.types import ReplyKeyboardMarkup
 from telegram_bot_calendar import LSTEP
 from telegram_bot_calendar import DetailedTelegramCalendar
 
+from leistungsbot import leistungs_calendar
 from leistungsbot import leistungs_config as lc
 from leistungsbot.google_place import Places
 from leistungsbot.leistungs_db import LeistungsDB
@@ -47,6 +48,13 @@ class Helper:
         self.temp_dir = tempfile.gettempdir()
         self.google = Places()
         self.dateformat = "%d.%m.%Y"
+        #: `None` unless a calendar is configured. Subscribed rather than
+        #: called: a leistungstag is closed from a handler, from a button
+        #: and from the scheduler, and the table is the one place all three
+        #: pass through. See `leistungsbot.leistungs_calendar`.
+        self.calendar = leistungs_calendar.from_config(self.db)
+        if self.calendar:
+            self.db.subscribe(self.calendar.on_change)
 
     def filter(self):
         def inn(callback):

@@ -26,6 +26,7 @@ import sqlite3
 from datetime import date
 from datetime import datetime
 from enum import Enum
+from enum import auto
 from pathlib import Path
 
 from leistungsbot import leistungs_config as lc
@@ -47,11 +48,54 @@ class LeistungsTagState(Enum):
     CLOSED = 2
 
 
+class Change(Enum):
+    """! What happened to a leistungstag, for whoever is listening
+
+    Announced by the four methods that write to the table. Closing a poll
+    and moving a leistungstag to another location are both `UPDATED`: from
+    the outside they are the same thing, a row that now says something else.
+    """
+
+    CREATED = auto()
+    UPDATED = auto()
+    REMOVED = auto()
+
+
 class LeistungsDB:
     def __init__(self):
         self.google = Places()
         self.mydb = None
+        #: Called with (`Change`, the leistungstag row) after every write to
+        #: the table. The calendar sync is the reason this exists - see
+        #: `leistungsbot.leistungs_calendar` - and the alternative was for
+        #: every caller of `closeLeistungstag` to remember to say so.
+        self.listeners: list = []
         self.connect()
+
+    # ─────────────────────────────── listeners ──────────────────────────────
+
+    def subscribe(self, listener) -> None:
+        """! Hands `listener` every later change to the leistungstag table"""
+        self.listeners.append(listener)
+
+    def announce(self, change: Change, leistungstag: dict | None) -> None:
+        """! Tells the listeners about one write
+
+        Swallows whatever a listener raises. The write has already happened,
+        and a calendar that is having a bad day must not turn a successful
+        poll into a failed command.
+        """
+        if not leistungstag:
+            return
+        for listener in self.listeners:
+            try:
+                listener(change, leistungstag)
+            except Exception:
+                logging.exception(
+                    "a listener failed on %s of leistungstag %s",
+                    change.name.lower(),
+                    leistungstag.get("key"),
+                )
 
     # ────────────────────────────── connection ──────────────────────────────
 
@@ -352,7 +396,13 @@ class LeistungsDB:
         poll_id: int,
         venue_id: int,
         type: int,
-    ):
+    ) -> int:
+        """! Writes a leistungstag down
+
+        @returns The key of the new row, which is what the listeners are
+                 told about and what a caller would otherwise have to look
+                 up by poll id
+        """
         cursor = self.cursor()
         cursor.execute(
             'INSERT INTO "leistungstag" ("location", "date", "poll_id", '
@@ -365,6 +415,9 @@ class LeistungsDB:
                 int(type),
             ),
         )
+        key = cursor.lastrowid
+        self.announce(Change.CREATED, self.getLeistungstag(key))
+        return key
 
     def getLeistungstag(self, key: int):
         cursor = self.cursor(dictionary=True)
@@ -399,10 +452,15 @@ class LeistungsDB:
             'UPDATE "leistungstag" SET "closed" = 1 WHERE "key" = ?;',
             (leistungstag_key,),
         )
+        self.announce(Change.UPDATED, self.getLeistungstag(leistungstag_key))
 
     def removeLeistungstag(self, key: int):
+        # read before the delete: the listeners are told which leistungstag
+        # is gone, and afterwards there is nothing left to tell them about
+        leistungstag = self.getLeistungstag(key)
         cursor = self.cursor()
         cursor.execute('DELETE FROM "leistungstag" WHERE "key" = ?;', (key,))
+        self.announce(Change.REMOVED, leistungstag)
 
     def getHistory(self, type: int = None, limit: int = 100):
         cursor = self.cursor(dictionary=True)
@@ -500,6 +558,7 @@ class LeistungsDB:
             'UPDATE "locations" SET "visited" = 1 WHERE "key" = ?;',
             (new_location_id,),
         )
+        self.announce(Change.UPDATED, self.getLeistungstag(lt_id))
 
     # ────────────────────────────── participants ────────────────────────────
 

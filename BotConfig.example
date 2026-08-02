@@ -10,3 +10,12 @@ leistungsadmin_id: '-1234567890'
 usernames:
   - 'MyCoolName'  # YOUR USERNAME THIS IS MANDTORY
 backupchat_id: "your-backup-channel-id"
+
+# Optional: keep a calendar in step with the leistungstage. Needs a google
+# service account whose json key is at `credentials`, and the calendar has
+# to be shared with that account's email address ("make changes to events").
+# calendar:
+#   provider: "google"
+#   calendar_id: 'abc123@group.calendar.google.com'
+#   credentials: '/data/google-service-account.json'
+#   timezone: 'Europe/Vienna'

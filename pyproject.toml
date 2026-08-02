@@ -24,6 +24,8 @@ python-telegram-bot-calendar = "^1.0.5"
 # imported by leistungs_config, for the default config location
 platformdirs = "^4.2.2"
 confuse = "^2.0.1"
+google-api-python-client = "^2.198.0"
+google-auth = "^2.56.2"
 
 
 [tool.poetry.scripts]

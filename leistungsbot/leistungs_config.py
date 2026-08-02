@@ -25,6 +25,17 @@ template = {
     "leistungsadmin_id": [int, str],
     "backupchat_id": confuse.Optional([int, str]),
     "usernames": confuse.StrSeq(),
+    # Absent means no calendar is kept, which is what every deployment did
+    # before there was one. See leistungsbot.leistungs_calendar.
+    "calendar": confuse.Optional(
+        {
+            "provider": confuse.Optional(str, default="google"),
+            "calendar_id": confuse.Optional(str, default=None),
+            "credentials": confuse.Optional(str, default=None),
+            "timezone": confuse.Optional(str, default="Europe/Vienna"),
+        },
+        default=None,
+    ),
 }
 
 __config = confuse.Configuration("LeistungsBot", __name__)
