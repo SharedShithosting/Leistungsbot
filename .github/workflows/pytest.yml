@@ -26,14 +26,34 @@ jobs:
           python-version: 3.11
       - name: Shutdown Ubuntu MySQL (SUDO)
         run: sudo service mysql stop # Shutdown the Default MySQL, "sudo" is necessary, please not remove it
+      # `with:` does not expand shell variables, so `$LEISTUNGSBOT_MYSQL__DB`
+      # used to create a database and a user literally called that.
       - name: Set up MariaDB
         uses: getong/mariadb-action@v1.11
         with:
-          mysql database: $LEISTUNGSBOT_MYSQL__DB
-          mysql user: $LEISTUNGSBOT_MYSQL__USER
+          mysql database: ${{ vars.LEISTUNGSBOT_MYSQL__DB }}
+          mysql user: ${{ vars.LEISTUNGSBOT_MYSQL__USER }}
           mysql password: '${{ secrets.LEISTUNGSBOT_MYSQL__PASSWORD }}'
           mysql root password: ${{ secrets.MYSQL_ROOT }}
-      - run: mysql -h 127.0.0.1 --port 3306 -uroot -p${{ secrets.MYSQL_ROOT }} -e "source example_db/leistung_db.sql"
+      - name: Load the example database
+        run: mysql -h 127.0.0.1 --port 3306 -uroot -p${{ secrets.MYSQL_ROOT }} -e "source example_db/leistung_db.sql"
+      # leistung_db.sql drops and recreates the database, so make sure the bot
+      # user exists and can reach whatever came out of it.
+      - name: Grant the bot user access
+        run: |
+          mysql -h 127.0.0.1 --port 3306 -uroot -p'${{ secrets.MYSQL_ROOT }}' -e "
+            CREATE USER IF NOT EXISTS '${{ vars.LEISTUNGSBOT_MYSQL__USER }}'@'%'
+              IDENTIFIED BY '${{ secrets.LEISTUNGSBOT_MYSQL__PASSWORD }}';
+            GRANT ALL PRIVILEGES ON \`${{ vars.LEISTUNGSBOT_MYSQL__DB }}\`.*
+              TO '${{ vars.LEISTUNGSBOT_MYSQL__USER }}'@'%';
+            FLUSH PRIVILEGES;"
+      - name: Check that the bot user can read the database
+        run: |
+          mysql -h 127.0.0.1 --port 3306 \
+            -u'${{ vars.LEISTUNGSBOT_MYSQL__USER }}' \
+            -p'${{ secrets.LEISTUNGSBOT_MYSQL__PASSWORD }}' \
+            '${{ vars.LEISTUNGSBOT_MYSQL__DB }}' \
+            -e "SELECT COUNT(*) AS leistungstage FROM leistungstag;"
       # Install Poetry. You could do this manually, or there are several actions that do this.
       # `snok/install-poetry` seems to be minimal yet complete, and really just calls out to
       # Poetry's default install script, which feels correct. I pin the Poetry version here
@@ -80,11 +100,18 @@ jobs:
           "\(.key)=\(.value)"' >> $GITHUB_ENV
       # And finally run tests. I'm using pytest and all my pytest config is in my `pyproject.toml`
       # so this line is super-simple. But it could be as complex as you need.
+      # LEISTUNGSBOT_REQUIRE_DB turns the integration tests' "no server, skip"
+      # into a failure. This job is the only place they can run, so a silent
+      # skip here means they never run anywhere.
       - run: poetry run pytest --junitxml=reports/junit/junit.xml
+        env:
+          LEISTUNGSBOT_REQUIRE_DB: '1'
       # Generate badges
       - run: poetry run genbadge tests -o reports/badges/tests-badge.svg
       # Run coverage tests
       - run: poetry run coverage run -m pytest
+        env:
+          LEISTUNGSBOT_REQUIRE_DB: '1'
       - run: poetry run coverage report -m
       - run: poetry run coverage xml -o reports/coverage/coverage.xml
       - run: poetry run coverage html -d reports/coverage
