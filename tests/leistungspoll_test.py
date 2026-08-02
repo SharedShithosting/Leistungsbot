@@ -6,8 +6,9 @@
 # #############################################################################
 """/leistungspoll - the main workflow.
 
-    /leistungspoll -> location -> date -> open hours -> dry run -> publish
+/leistungspoll -> location -> date -> open hours -> dry run -> publish
 """
+
 from __future__ import annotations
 
 from datetime import datetime

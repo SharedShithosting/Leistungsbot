@@ -6,8 +6,9 @@
 # #############################################################################
 """/message - let the bot say something in the leistungschat.
 
-    /message <text> -> pick a poll to reply to (or "Nö") -> leistungschat
+/message <text> -> pick a poll to reply to (or "Nö") -> leistungschat
 """
+
 from __future__ import annotations
 
 from tests import support

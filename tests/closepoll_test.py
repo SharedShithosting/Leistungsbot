@@ -9,6 +9,7 @@
 Both pick an open poll from a button list; the sneaky variant does the same
 thing but tells nobody in the leistungschat.
 """
+
 from __future__ import annotations
 
 import pytest

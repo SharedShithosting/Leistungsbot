@@ -15,6 +15,7 @@ Runs in the `pytest` workflow, which starts a MariaDB and loads
 need a reachable server, and the replay additionally needs credentials that
 may create a database.
 """
+
 from __future__ import annotations
 
 import os

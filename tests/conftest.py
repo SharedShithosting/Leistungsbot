@@ -23,6 +23,7 @@ talk to the real service and would break if we overwrote the credentials:
 Both fall back to a placeholder when nothing is configured, and the tests
 that need them skip when they cannot connect.
 """
+
 from __future__ import annotations
 
 import os

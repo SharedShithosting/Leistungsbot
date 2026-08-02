@@ -9,6 +9,7 @@
 There is no "next tuesday" suggestion here, the calendar opens right away and
 any weekday is fine.
 """
+
 from __future__ import annotations
 
 from datetime import date

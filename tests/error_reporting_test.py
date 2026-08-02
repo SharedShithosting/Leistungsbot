@@ -11,6 +11,7 @@ stale chat id in the configuration made the reporter itself throw and the
 original cause was lost - which is exactly how a /backup failure showed up
 as "group chat was upgraded to a supergroup chat".
 """
+
 from __future__ import annotations
 
 from telebot.apihelper import ApiTelegramException
