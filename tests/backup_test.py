@@ -63,6 +63,32 @@ def test_the_dump_does_not_stay_on_disk(app, db, tmp_path):
     assert os.listdir(tmp_path) == []
 
 
+def test_an_incomplete_dump_is_flagged_to_the_user(app, db):
+    db.dump.return_value = (
+        "-- LeistungsBot database dump\n"
+        "-- WARNING: this dump is incomplete\n"
+        "-- view `events` is missing: SHOW VIEW command denied\n"
+        "SELECT 1;\n"
+    )
+
+    support.send_command(app, "/backup")
+
+    support.assert_no_dev_error(app)
+    app.bot.send_document.assert_called_once()
+    caption = app.bot.send_document.call_args.kwargs["caption"]
+    assert "NED vollständig" in caption
+
+
+def test_a_complete_dump_is_not_flagged(app, db):
+    db.dump.return_value = DUMP
+
+    support.send_command(app, "/backup")
+
+    support.assert_no_dev_error(app)
+    caption = app.bot.send_document.call_args.kwargs["caption"]
+    assert "NED vollständig" not in caption
+
+
 def test_a_failing_dump_is_reported(app, db):
     db.dump.side_effect = RuntimeError("no connection to the database")
 
