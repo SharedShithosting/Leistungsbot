@@ -90,20 +90,13 @@ def test_cancel_takes_the_keyboard_away(app, state_name):
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "#13: /cancel is registered with state='*', which telebot only "
-        "matches when a state is actually set, so /cancel outside a "
-        "conversation is silently ignored"
-    ),
-)
 def test_cancel_without_a_state_is_harmless(app):
-    """#13, narrowed down.
+    """#13, the last piece of it.
 
     Inside a conversation /cancel works - every test above proves it. What
-    does nothing is /cancel on its own, which is how the command looks to
-    anyone who types it speculatively.
+    did nothing is /cancel on its own, which is how the command looks to
+    anyone who types it speculatively: it was registered with `state="*"`,
+    and telebot matches that only while a state is set.
     """
     assert support.state_of(app) is None
 
@@ -111,6 +104,44 @@ def test_cancel_without_a_state_is_harmless(app):
 
     support.assert_said(app, "Halt Stop.")
     support.assert_no_dev_error(app)
+
+
+def test_cancel_without_a_state_leaves_it_that_way(app):
+    assert support.state_of(app) is None
+
+    support.send_command(app, "/cancel")
+
+    assert support.state_of(app) is None
+
+
+def test_cancel_without_a_state_takes_the_keyboard_away(app):
+    """The reply keyboard outlives the conversation that put it there."""
+    support.send_command(app, "/cancel")
+
+    removals = [
+        kwargs.get("reply_markup")
+        for name, _, kwargs in app.outbox
+        if name == "send_message" and kwargs.get("reply_markup") is not None
+    ]
+    assert any(
+        type(markup).__name__ == "ReplyKeyboardRemove" for markup in removals
+    )
+
+
+def test_cancel_still_wins_against_the_state_handlers(app):
+    """Dropping the state filter must not let a state handler eat /cancel.
+
+    `/leistungspoll` listens for a location name; without the ordering
+    below, /cancel would arrive there as one.
+    """
+    support.send_command(app, "/leistungspoll")
+    assert support.state_of(app) == "LeistungsState:normalLocation"
+
+    support.send_command(app, "/cancel")
+
+    support.assert_said(app, "Halt Stop.")
+    support.assert_not_said(app, "kenn i ned")
+    assert support.state_of(app) is None
 
 
 # --- the 🍻cancel buttons -----------------------------------------------

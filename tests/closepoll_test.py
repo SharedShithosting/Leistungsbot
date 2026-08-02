@@ -136,6 +136,24 @@ def test_an_already_closed_poll_asks_for_confirmation(app, db):
     db.closeLeistungstag.assert_not_called()
 
 
+def test_the_admin_of_an_instance_can_close_a_poll(app, db, close_command):
+    """#9, end to end: the bot was never promoted in the leistungschat.
+
+    The whole command, not just the button - this is what the reporter did
+    on their own instance and got "nicht für den Pöbel" for. The check was
+    handed the message the button sits on, which the bot sent, so it asked
+    about the bot: not an admin there, refused everybody. See #99.
+    """
+    app.plebs.add(support.BOT_USER_ID)
+
+    support.send_command(app, close_command)
+    support.press(app, {"🍻open": OPEN_KEY})
+
+    support.assert_no_dev_error(app)
+    support.assert_not_said(app, "nicht für den Pöbel")
+    db.closeLeistungstag.assert_called_once_with(OPEN_KEY)
+
+
 def test_a_press_without_state_does_nothing(app, db):
     """The 🍻open button is shared by reminder, close and message."""
     support.press(app, {"🍻open": OPEN_KEY})

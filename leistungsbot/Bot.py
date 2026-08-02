@@ -86,7 +86,14 @@ class LeistungsBot(
         ("rate_location_handler", {"commands": Commands.RATE_LOCATION.names}),
         ("show_locations", {"commands": Commands.SHOW_LOCATIONS.names}),
         ("message_command", {"commands": Commands.MESSAGE.names}),
-        ("cancel", {"state": "*", "commands": Commands.CANCEL.names}),
+        # No state filter, on purpose. `state="*"` reads as "in any state",
+        # but telebot's StateFilter answers it with
+        # `text == "*" and user_state is not None` - so it matches every
+        # state except not being in one, and /cancel typed on its own was
+        # silently ignored (#13). A handler without the filter matches
+        # regardless of state; it wins over the state handlers below because
+        # they are registered after it.
+        ("cancel", {"commands": Commands.CANCEL.names}),
         ("get_poll_location", {"state": LeistungsState.normalLocation}),
         (
             "get_konkurrenz_location",
