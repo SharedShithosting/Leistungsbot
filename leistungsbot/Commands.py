@@ -91,7 +91,9 @@ SNEAKY_CLOSEPOLL = Command(
 PURGE = Command("purge", "Delete a poll", Access.ADMIN)
 HISTORY = Command("history", "Show past leistungstage")
 SENDREMINDER = Command(
-    "sendreminder", "Remind the chat about a poll", Access.ADMIN
+    "sendreminder",
+    "Remind the chat about a poll",
+    Access.ADMIN,
 )
 SWITCHEROO = Command(
     "switcheroo",
