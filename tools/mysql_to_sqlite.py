@@ -12,7 +12,6 @@ dumped as survive the trip.
 Works with a mysqldump as well as with a dump from the bot's own /backup,
 as long as the INSERTs carry their column names.
 """
-
 from __future__ import annotations
 
 import re

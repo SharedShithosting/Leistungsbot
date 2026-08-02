@@ -5,7 +5,6 @@
 #  this stuff is worth it, you can buy me a beer in return Poul-Henning Kamp  #
 # #############################################################################
 """/backup - send a copy of the database as a document. Admins only."""
-
 from __future__ import annotations
 
 import os

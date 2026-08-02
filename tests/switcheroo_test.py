@@ -8,7 +8,6 @@
 
 /switcheroo -> leistungstag number -> new location -> db
 """
-
 from __future__ import annotations
 
 from tests import support
