@@ -48,7 +48,7 @@ class LeistungsDB:
             return True
         except Exception as e:
             self.mydb = mysql.connector.MySQLConnection()
-            logging.error("Error while connecting to MySQL", e)
+            logging.error("Error while connecting to MySQL: %s", e)
             return False
 
     def convert(self, mysql_res, skinny_bitch=False):
@@ -734,6 +734,25 @@ class LeistungsDB:
             return f"'{value.isoformat()}'"
         return f"'{self.converter.escape(str(value))}'"
 
+    def portableView(self, create: str) -> str:
+        """! Makes a `SHOW CREATE VIEW` statement restorable anywhere
+
+        The server qualifies every table in the definition with the database
+        it was dumped from and pins the definer to a user account. Restored
+        as is, the view of a dump would read from the *original* database
+        instead of the restored one, and would fail outright on a machine
+        where that user does not exist.
+
+        @param create The statement as `SHOW CREATE VIEW` returns it
+
+        @returns The same statement without definer and database qualifier
+        """
+        create = re.sub(r"DEFINER=\S+@\S+\s+", "", create)
+        database = lc.config["mysql"]["db"]
+        if database:
+            create = create.replace(f"`{database}`.", "")
+        return create
+
     def dump(self) -> str:
         """! Dumps the whole database as SQL
 
@@ -787,7 +806,7 @@ class LeistungsDB:
             create = cursor.fetchone()[1]
             lines += [
                 f"DROP VIEW IF EXISTS `{view}`;",
-                f"{create};",
+                f"{self.portableView(create)};",
                 "",
             ]
 

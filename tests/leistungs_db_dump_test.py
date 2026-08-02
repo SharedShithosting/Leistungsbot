@@ -151,6 +151,29 @@ def test_empty_table_gets_no_insert(real_db):
     assert f"{CREATE_LOCATIONS};" in dump
 
 
+def test_views_lose_their_definer_and_database(real_db):
+    create = (
+        "CREATE ALGORITHM=UNDEFINED DEFINER=`leistungs_user`@`%` "
+        "SQL SECURITY DEFINER VIEW `leistungs_db`.`leistungs_view` AS "
+        "select `leistungs_db`.`leistungstag`.`key` AS `key` "
+        "from `leistungs_db`.`leistungstag`"
+    )
+
+    portable = real_db.portableView(create)
+
+    assert "DEFINER=" not in portable
+    assert "`leistungs_db`." not in portable
+    assert portable.startswith("CREATE ALGORITHM=UNDEFINED SQL SECURITY")
+    assert "VIEW `leistungs_view` AS" in portable
+    assert "from `leistungstag`" in portable
+
+
+def test_a_plain_view_survives_untouched(real_db):
+    create = "CREATE VIEW `leistungs_view` AS select 1"
+
+    assert real_db.portableView(create) == create
+
+
 @pytest.mark.parametrize(
     "value,expected",
     [

@@ -47,6 +47,12 @@ build-backend = "poetry_dynamic_versioning.backend"
 disallow_untyped_defs = true
 
 
+[tool.pytest.ini_options]
+markers = [
+  "integration: needs a reachable MySQL server, skipped otherwise",
+]
+
+
 [tool.coverage.run]
 source = ["leistungsbot"]
 branch = true
