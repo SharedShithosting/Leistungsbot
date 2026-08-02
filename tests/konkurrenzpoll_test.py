@@ -33,7 +33,7 @@ def test_location_leads_to_the_date_suggestion(app):
     support.send_command(app, "Bar A")
 
     support.assert_no_dev_error(app)
-    assert app.poller.type == LeistungsTyp.KONKURENZ
+    assert support.poller_of(app).type == LeistungsTyp.KONKURENZ
     support.assert_said(app, "Für wann wollen ma pollen?")
 
 
@@ -69,7 +69,10 @@ def test_publishing_stores_a_konkurrenz_leistungstag(app, db):
 
 
 def test_non_tuesday_is_blasphemy(app, monkeypatch):
-    monkeypatch.setattr("leistungsbot.Bot.time.sleep", lambda _: None)
+    # patched on the time module itself, not on whichever of our modules
+    # imported it - that used to be leistungsbot.Bot and is now
+    # leistungsbot.handlers.polls
+    monkeypatch.setattr("time.sleep", lambda _: None)
     support.send_command(app, "/konkurrenzpoll")
     support.send_command(app, "Bar A")
     support.press(app, {"🍻poll_date": None})  # "Anderes Datum"

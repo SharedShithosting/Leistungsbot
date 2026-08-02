@@ -249,3 +249,16 @@ def last_markup(app) -> Any:
 
 def state_of(app, user_id: int = ADMIN_USER_ID, chat_id: int = GROUP_CHAT_ID):
     return app.bot.get_state(user_id, chat_id)
+
+
+def context_of(app, user_id: int = ADMIN_USER_ID):
+    """The half finished workflow the bot is holding for `user_id`.
+
+    Per user rather than per bot, so a test can check that two senders do
+    not share one in-flight poll.
+    """
+    return app.user_context[user_id]
+
+
+def poller_of(app, user_id: int = ADMIN_USER_ID):
+    return context_of(app, user_id).poller

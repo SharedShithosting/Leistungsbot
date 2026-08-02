@@ -11,15 +11,17 @@ include = [
   { path = "leistungsbot/schema.sql", format = ["sdist", "wheel"] },
 ]
 
+# Only what leistungsbot/ actually imports. requests, urllib3 and pyyaml
+# used to be listed here too, which read as if the code used them - it never
+# did. They arrive through googlemaps/pyTelegramBotAPI, requests and confuse
+# respectively, and poetry.lock is what pins them. See #85.
 [tool.poetry.dependencies]
 python = "^3.11"
 pyTelegramBotAPI = "^4.5.0"
 googlemaps = "^4.10.0"
-pyyaml = "^6.0.2"
-urllib3 = "^2.2.2"
 schedule = "^1.2.2"
 python-telegram-bot-calendar = "^1.0.5"
-requests = "^2.32.3"
+# imported by leistungs_config, for the default config location
 platformdirs = "^4.2.2"
 confuse = "^2.0.1"
 
@@ -89,6 +91,10 @@ required-imports = ["from __future__ import annotations"]
 [tool.coverage.run]
 source = ["leistungsbot"]
 branch = true
+omit = [
+  # the `python -m leistungsbot` shim, three lines that only call main()
+  "leistungsbot/__main__.py",
+]
 
 [tool.coverage.report]
 show_missing = true
@@ -98,3 +104,8 @@ exclude_also = [
   "if TYPE_CHECKING:",
   "raise NotImplementedError",
 ]
+
+# There is no per file equivalent of fail_under, so the 75% floor every
+# file has to clear lives in tools/check_coverage.py. This one keeps the
+# project total honest as well.
+fail_under = 75

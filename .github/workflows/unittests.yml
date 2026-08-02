@@ -1,7 +1,10 @@
 # The mocked unit tests. Database, google places and telegram are replaced by
-# test doubles, so this workflow needs no secrets, no MariaDB service and no
-# network - unlike `pytest.yml`, which does and therefore runs in the
+# test doubles, so this workflow needs no secrets, no database and no network
+# - unlike `integrationtests.yml`, which does and therefore runs in the
 # "My Environment" environment.
+#
+# This is the workflow that gates pull requests, including the per file
+# coverage floor.
 name: unittests
 on:
   push:
@@ -34,6 +37,12 @@ jobs:
           poetry run coverage report
           poetry run coverage xml -o reports/coverage/coverage.xml
           poetry run coverage html -d reports/coverage
+          poetry run coverage json -o reports/coverage/coverage.json
+      # Every file has to clear 75%, not just the project as a whole: a
+      # module with no tests at all hides behind a good total otherwise,
+      # which is how BotScheduler shipped a job pointing at nothing.
+      - name: Per file coverage gate
+        run: poetry run python tools/check_coverage.py reports/coverage/coverage.json
       - name: Coverage summary
         if: always()
         run: |
@@ -41,7 +50,10 @@ jobs:
             echo "### Coverage (python ${{ matrix.python-version }})"
             echo
             echo '```'
-            poetry run coverage report
+            # `|| true`: coverage report exits nonzero under fail_under, and
+            # the summary should still render when it does - the gate above
+            # is what fails the build.
+            poetry run coverage report || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Archive reports

@@ -1,7 +1,28 @@
-[![Tests Status](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/pytest.yml/reports/junit/junit-badge.svg?dummy=8484744)](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/pytest.yml/reports/junit/report.html)
+[![Tests Status](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/integrationtests.yml/reports/junit/junit-badge.svg?dummy=8484744)](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/integrationtests.yml/reports/junit/report.html)
 [![Docker Image CI](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/docker-image.yml/badge.svg)](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/docker-image.yml)
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/SharedShithosting/Leistungsbot/main.svg)](https://results.pre-commit.ci/latest/github/SharedShithosting/Leistungsbot/main)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
+
+## Development database
+
+The bot needs a database with something in it before most commands do
+anything interesting. `tools/seed_dev_db.py` builds one full of invented
+data - pubs that do not exist, telegram ids far below the range telegram
+issues, and leistungstage spread around today so `/history`,
+`/sendreminder` and the scheduler's reminder window all have something to
+find:
+
+```bash
+python tools/seed_dev_db.py
+LEISTUNGSBOT_SQLITE__PATH=$PWD/leistungs_db.dev.sqlite python -m leistungsbot
+```
+
+The same seed always produces the same database, so `--seed 7` gives a
+different but equally repeatable set.
+
+To look inside it, `docker compose --profile dev up` starts a SQLite
+browser on <https://localhost:3001>.
 
 
 ## Intro

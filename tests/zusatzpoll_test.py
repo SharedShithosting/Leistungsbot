@@ -45,8 +45,8 @@ def test_location_opens_the_calendar_instead_of_a_suggestion(app):
     support.send_command(app, "Bar A")
 
     support.assert_no_dev_error(app)
-    assert app.poller.type == LeistungsTyp.ZUSATZ
-    assert app.poller.location == "Bar A"
+    assert support.poller_of(app).type == LeistungsTyp.ZUSATZ
+    assert support.poller_of(app).location == "Bar A"
     support.assert_said(app, "Select year")
     support.assert_not_said(app, "Für wann wollen ma pollen?")
 

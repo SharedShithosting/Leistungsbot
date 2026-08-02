@@ -52,6 +52,7 @@ _API_METHODS = {
     "edit_message_reply_markup",
     "get_chat_member",
     "get_me",
+    "set_my_commands",
 }
 
 SNAPSHOT = b"SQLite format 3\x00-- test snapshot"
