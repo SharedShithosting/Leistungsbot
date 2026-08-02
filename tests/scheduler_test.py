@@ -37,7 +37,9 @@ def scheduler(monkeypatch, db):
     # second Scheduler would otherwise inherit the first one's
     schedule_module.clear()
     monkeypatch.setattr(
-        Scheduler, "run_continuously", lambda self: MagicMock()
+        Scheduler,
+        "run_continuously",
+        lambda self: MagicMock(),
     )
 
     helper = MagicMock(name="helper")
