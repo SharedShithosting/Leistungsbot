@@ -110,14 +110,6 @@ class Scheduler:
                 prev["poll_id"],
             )
 
-
-if __name__ == "__main__":
-    from leistungsbot.BotHelper import Helper
-
-    bot = telebot.TeleBot(lc.config["bot_token"])
-    s = Scheduler(bot, Helper(bot))
-    s.start()
-
     def send_backup(self) -> None:
         """! Posts a copy of the database into the backup chat
 
@@ -129,3 +121,11 @@ if __name__ == "__main__":
             logging.debug("no backupchat_id configured, skipping the backup")
             return
         self.helper.send_backup(chat_id)
+
+
+if __name__ == "__main__":
+    from leistungsbot.BotHelper import Helper
+
+    bot = telebot.TeleBot(lc.config["bot_token"])
+    s = Scheduler(bot, Helper(bot))
+    s.start()
