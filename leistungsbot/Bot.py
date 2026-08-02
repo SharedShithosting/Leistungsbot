@@ -74,858 +74,533 @@ class UserContext(TypedDict):
 
 
 class LeistungsBot:
+    #: Handler methods in registration order, see `register_handlers`.
+    #: Kept as names rather than functions so the table can live on the
+    #: class, right next to the methods it lists.
+    MESSAGE_HANDLERS = (
+        ("showIds", {"commands": Commands.SHOW_IDS.names}),
+        ("stats", {"commands": Commands.STATS.names}),
+        ("ViewTheLogsFile", {"commands": Commands.BOTLOGS.names}),
+        ("help_command", {"commands": Commands.HELP.names}),
+        ("purge", {"commands": Commands.PURGE.names}),
+        ("alive", {"commands": Commands.ALIVE.names}),
+        ("start", {"commands": Commands.START.names}),
+        ("poll_now", {"commands": Commands.LEISTUNGSPOLL.names}),
+        ("zusatz_poll", {"commands": Commands.ZUSATZPOLL.names}),
+        ("konkurrenz_poll", {"commands": Commands.KONKURRENZPOLL.names}),
+        ("send_reminder", {"commands": Commands.SENDREMINDER.names}),
+        ("close_poll", {"commands": Commands.CLOSEPOLL.names}),
+        ("sneaky_close_poll", {"commands": Commands.SNEAKY_CLOSEPOLL.names}),
+        ("send_nudes", {"commands": Commands.SENDNUDES.names}),
+        ("add_location", {"commands": Commands.ADD_LOCATION.names}),
+        ("backup", {"commands": Commands.BACKUP.names}),
+        (
+            "remove_location_handler",
+            {"commands": Commands.REMOVE_LOCATION.names},
+        ),
+        ("history", {"commands": Commands.HISTORY.names}),
+        ("rate_location_handler", {"commands": Commands.RATE_LOCATION.names}),
+        ("show_locations", {"commands": Commands.SHOW_LOCATIONS.names}),
+        ("message_command", {"commands": Commands.MESSAGE.names}),
+        ("cancel", {"state": "*", "commands": Commands.CANCEL.names}),
+        ("get_poll_location", {"state": LeistungsState.normalLocation}),
+        (
+            "get_konkurrenz_location",
+            {"state": LeistungsState.konkurrenzLocation},
+        ),
+        ("get_zusatz_location", {"state": LeistungsState.zusatzLocation}),
+        ("remove_location", {"state": LeistungsState.removeLocation}),
+        ("search_location", {"state": LeistungsState.searchLocation}),
+        ("rate_location", {"state": LeistungsState.rateLocation}),
+        (
+            "switcheroo_leistungstag_number",
+            {"state": LeistungsState.switcherooLeistungstagNumber},
+        ),
+        (
+            "switcheroo_alternate_location",
+            {"state": LeistungsState.switcherooAlternateLocation},
+        ),
+        ("switcheroo", {"commands": Commands.SWITCHEROO.names}),
+        ("version", {"commands": Commands.VERSION.names}),
+    )
+
     def __init__(self) -> None:
-        self.bot = bot = telebot.TeleBot(lc.config["bot_token"])
+        self.bot = telebot.TeleBot(lc.config["bot_token"])
         self.bot.add_custom_filter(custom_filters.StateFilter(self.bot))
         self.helper = Helper(self.bot)
         self.scheduler = Scheduler(self.bot, self.helper)
         self.poller = None
         self.last_text_nudes = datetime.min
         self.user_context: dict[int, UserContext] = {}
+        self.register_handlers()
 
-        @bot.callback_query_handler(func=DetailedTelegramCalendar.func())
-        def cal(call):
-            result, key, step = DetailedTelegramCalendar(
-                min_date=date.today(),
-            ).process(call.data)
-            if not result and key:
-                self.helper.bot.edit_message_text(
-                    f"Select {LSTEP[step]}",
-                    call.message.chat.id,
-                    call.message.message_id,
-                    reply_markup=key,
+    def register_handlers(self) -> None:
+        """! Points telebot at the handler methods, in order
+
+        The order is load bearing and always was - it just used to be
+        implied by where a `def` happened to sit in a 900 line `__init__`.
+        Telebot dispatches to the first handler that matches, so a state
+        handler listed above a command handler swallows that command.
+        Reordering this list changes behaviour.
+        """
+        bot = self.bot
+
+        bot.register_callback_query_handler(
+            self.cal,
+            func=DetailedTelegramCalendar.func(),
+        )
+        bot.register_callback_query_handler(
+            self.callback_query,
+            func=self.helper.filter(),
+        )
+
+        for handler, kwargs in self.MESSAGE_HANDLERS:
+            # `@bot.message_handler` defaults content_types to text,
+            # `register_message_handler` hands the None straight through and
+            # a handler without content types matches every kind of message.
+            # Passing it explicitly keeps these handlers text only.
+            bot.register_message_handler(
+                getattr(self, handler),
+                content_types=["text"],
+                **kwargs,
+            )
+
+    def cal(self, call):
+        result, key, step = DetailedTelegramCalendar(
+            min_date=date.today(),
+        ).process(call.data)
+        if not result and key:
+            self.helper.bot.edit_message_text(
+                f"Select {LSTEP[step]}",
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=key,
+            )
+        elif result:
+            self.helper.bot.edit_message_text(
+                f"You selected {result}",
+                call.message.chat.id,
+                call.message.message_id,
+            )
+            if not self.poller:
+                self.helper.bot.send_message(
+                    call.message.chat_id,
+                    "Da is wohl was schiefglaufen, i kann ka poll findn...",
                 )
-            elif result:
-                self.helper.bot.edit_message_text(
-                    f"You selected {result}",
+                return
+            if (
+                self.poller.type == LeistungsTyp.NORMAL
+                or self.poller.type == LeistungsTyp.KONKURENZ
+            ) and result.weekday() != 1:
+                self.helper.bot.send_message(
                     call.message.chat.id,
-                    call.message.message_id,
+                    "Blasphemie, des is ka Dienstag wast da du do ausgsuacht hast...alles auf eigene Gefahr!",
                 )
-                if not self.poller:
-                    self.helper.bot.send_message(
-                        call.message.chat_id,
-                        "Da is wohl was schiefglaufen, i kann ka poll findn...",
+                time.sleep(1)
+
+            self.check_open_hours_before_sending(call, result)
+
+    def callback_query(self, call):
+        try:
+            data = json.loads(call.data)
+            if len(data) == 0:
+                self.bot.answer_callback_query(
+                    call.id,
+                    "SHHEEEEESH des hod ned funktioniert",
+                )
+                return
+            cmd = [*data][0].replace("🍻", "")
+            val = [*data.values()][0]
+            self.bot.answer_callback_query(call.id, "Copy that")
+            if cmd == "search":
+                self.helper.approve_location(
+                    call.message.chat.id,
+                    val[0],
+                    val[1],
+                )
+            elif cmd == "select":
+                if val[1] < 0:
+                    if (self.helper.get_rand_len(val[0])) == 1:
+                        self.bot.send_message(
+                            call.message.chat.id,
+                            "Daun füg a boa mehr infos zu deiner Suche dazua...",
+                        )
+                    else:
+                        self.bot.send_message(
+                            call.message.chat.id,
+                            "Daun probiern mas numoi...",
+                            reply_markup=self.helper.restore_search_location_button(
+                                val[0],
+                            ),
+                        )
+                else:
+                    res = self.helper.add_location(val[0], val[1])
+                    if res == LeistungsReturnCodes.DB_DUPLICATE:
+                        self.bot.send_message(
+                            call.message.chat.id,
+                            "Des isch scho drin, du deppata!",
+                        )
+            elif cmd == "cancle":
+                self.process_cancle(call.message)
+            elif cmd == "publish":
+                self.helper.publish_leistungstag(val)
+                self.bot.send_message(
+                    call.message.chat.id,
+                    "Hauma so veröffentlicht",
+                )
+            elif cmd == "q":
+                self.process_search_location(call.message.chat.id, val)
+            elif cmd == "history_type":
+                self.bot.send_message(
+                    call.message.chat.id,
+                    "Welchen Leistungstag willst da anschaun?",
+                    reply_markup=self.helper.leistungstag_history_button(
+                        LeistungsTyp(val),
+                    ),
+                )
+            elif cmd == "purge_type":
+                self.bot.send_message(
+                    call.message.chat.id,
+                    "Welchen Leistungstag willst löschen?",
+                    reply_markup=self.helper.leistungstag_dry_purge_button(
+                        LeistungsTyp(val),
+                    ),
+                )
+            elif cmd == "history":
+                self.helper.send_history_info(
+                    call.message.chat.id,
+                    val,
+                )
+            elif cmd == "dry_purge":
+                self.helper.send_purge_info(
+                    call.message.chat.id,
+                    val,
+                )
+            elif cmd == "purge":
+                if self.helper.purge_leistungstag(val):
+                    self.bot.send_message(
+                        call.message.chat.id,
+                        "zack und weg ises",
                     )
-                    return
+                else:
+                    self.bot.send_message(
+                        call.message.chat.id,
+                        "De Nachrichtn muast leida manuell löschen",
+                    )
+            elif cmd == "location":
+                self.helper.send_location_info2(call.message.chat.id, val)
+            elif cmd == "open":
                 if (
-                    self.poller.type == LeistungsTyp.NORMAL
-                    or self.poller.type == LeistungsTyp.KONKURENZ
-                ) and result.weekday() != 1:
-                    self.helper.bot.send_message(
+                    self.bot.get_state(
+                        call.from_user.id,
                         call.message.chat.id,
-                        "Blasphemie, des is ka Dienstag wast da du do ausgsuacht hast...alles auf eigene Gefahr!",
                     )
-                    time.sleep(1)
-
-                self.check_open_hours_before_sending(call, result)
-
-        @bot.callback_query_handler(func=self.helper.filter())
-        def callback_query(call):
-            try:
-                data = json.loads(call.data)
-                if len(data) == 0:
-                    bot.answer_callback_query(
-                        call.id,
-                        "SHHEEEEESH des hod ned funktioniert",
-                    )
-                    return
-                cmd = [*data][0].replace("🍻", "")
-                val = [*data.values()][0]
-                bot.answer_callback_query(call.id, "Copy that")
-                if cmd == "search":
-                    self.helper.approve_location(
+                    == LeistungsState.remindePoll.name
+                ):
+                    self.process_reminder(call.message, val)
+                elif (
+                    self.bot.get_state(
+                        call.from_user.id,
                         call.message.chat.id,
-                        val[0],
-                        val[1],
                     )
-                elif cmd == "select":
-                    if val[1] < 0:
-                        if (self.helper.get_rand_len(val[0])) == 1:
-                            self.bot.send_message(
-                                call.message.chat.id,
-                                "Daun füg a boa mehr infos zu deiner Suche dazua...",
-                            )
-                        else:
-                            self.bot.send_message(
-                                call.message.chat.id,
-                                "Daun probiern mas numoi...",
-                                reply_markup=self.helper.restore_search_location_button(
-                                    val[0],
-                                ),
-                            )
-                    else:
-                        res = self.helper.add_location(val[0], val[1])
-                        if res == LeistungsReturnCodes.DB_DUPLICATE:
-                            self.bot.send_message(
-                                call.message.chat.id,
-                                "Des isch scho drin, du deppata!",
-                            )
-                elif cmd == "cancle":
-                    self.process_cancle(call.message)
-                elif cmd == "publish":
-                    self.helper.publish_leistungstag(val)
-                    bot.send_message(
+                    == LeistungsState.closePoll.name
+                ):
+                    self.process_closepoll(call.message, val)
+                elif (
+                    self.bot.get_state(
+                        call.from_user.id,
                         call.message.chat.id,
-                        "Hauma so veröffentlicht",
                     )
-                elif cmd == "q":
-                    self.process_search_location(call.message.chat.id, val)
-                elif cmd == "history_type":
-                    self.bot.send_message(
+                    == LeistungsState.sneakyClosePoll.name
+                ):
+                    self.process_closepoll(call.message, val, True)
+                elif (
+                    self.bot.get_state(
+                        call.from_user.id,
                         call.message.chat.id,
-                        "Welchen Leistungstag willst da anschaun?",
-                        reply_markup=self.helper.leistungstag_history_button(
-                            LeistungsTyp(val),
-                        ),
                     )
-                elif cmd == "purge_type":
-                    self.bot.send_message(
-                        call.message.chat.id,
-                        "Welchen Leistungstag willst löschen?",
-                        reply_markup=self.helper.leistungstag_dry_purge_button(
-                            LeistungsTyp(val),
-                        ),
-                    )
-                elif cmd == "history":
-                    self.helper.send_history_info(
-                        call.message.chat.id,
-                        val,
-                    )
-                elif cmd == "dry_purge":
-                    self.helper.send_purge_info(
-                        call.message.chat.id,
-                        val,
-                    )
-                elif cmd == "purge":
-                    if self.helper.purge_leistungstag(val):
-                        bot.send_message(
-                            call.message.chat.id,
-                            "zack und weg ises",
-                        )
-                    else:
-                        bot.send_message(
-                            call.message.chat.id,
-                            "De Nachrichtn muast leida manuell löschen",
-                        )
-                elif cmd == "location":
-                    self.helper.send_location_info2(call.message.chat.id, val)
-                elif cmd == "open":
-                    if (
-                        self.bot.get_state(
-                            call.from_user.id,
-                            call.message.chat.id,
-                        )
-                        == LeistungsState.remindePoll.name
-                    ):
-                        self.process_reminder(call.message, val)
-                    elif (
-                        self.bot.get_state(
-                            call.from_user.id,
-                            call.message.chat.id,
-                        )
-                        == LeistungsState.closePoll.name
-                    ):
-                        self.process_closepoll(call.message, val)
-                    elif (
-                        self.bot.get_state(
-                            call.from_user.id,
-                            call.message.chat.id,
-                        )
-                        == LeistungsState.sneakyClosePoll.name
-                    ):
-                        self.process_closepoll(call.message, val, True)
-                    elif (
-                        self.bot.get_state(
-                            call.from_user.id,
-                            call.message.chat.id,
-                        )
-                        == LeistungsState.genericLeistungsmessage.name
-                    ):
-                        self.process_generic_leistungsmessage(
-                            call.message.reply_to_message,
-                            val,
-                        )
-                elif cmd == "closed":
-                    self.bot.reply_to(
-                        call.message,
-                        "Der Poll is scho closed. Willst wirklich on den reminden?",
-                        reply_markup=self.helper.confirm_leistungstag_button(
-                            val,
-                        ),
-                    )
-                elif cmd == "no":
+                    == LeistungsState.genericLeistungsmessage.name
+                ):
                     self.process_generic_leistungsmessage(
                         call.message.reply_to_message,
                         val,
                     )
-                elif cmd == "poll_date":
-                    if val:
-                        if not self.poller:
-                            self.helper.bot.send_message(
-                                call.message.chat_id,
-                                "Da is wohl was schiefglaufen, i kann ka poll findn...",
-                            )
-                        else:
-                            self.check_open_hours_before_sending(
-                                call,
-                                datetime.strptime(
-                                    val,
-                                    self.helper.dateformat,
-                                ).date(),
-                            )
-                    else:
-                        self.helper.pick_date(call.message.chat.id)
-                elif cmd == "open_hours_checked":
-                    self.process_check_open_hours(call, val)
-                else:
-                    bot.send_message(
-                        lc.config["chat_id"],
-                        f"Hi Devs!!\nHandle this callback\n{cmd}",
-                    )
-                bot.edit_message_reply_markup(
-                    call.message.chat.id,
-                    call.message.message_id,
+            elif cmd == "closed":
+                self.bot.reply_to(
+                    call.message,
+                    "Der Poll is scho closed. Willst wirklich on den reminden?",
+                    reply_markup=self.helper.confirm_leistungstag_button(
+                        val,
+                    ),
                 )
-            except Exception as error:
-                self.helper.report_error(call.message, error)
-
-        @bot.message_handler(commands=Commands.SHOW_IDS.names)
-        def showIds(message):
-            try:
-                if message.from_user.username in lc.config["usernames"]:
-                    file = open("joined_groups.txt", "r ")
-                    bot.send_document(message.chat.id, file)
-                    file.close()
-
-            except Exception as error:
-                bot.send_message(lc.config["chat_id"], str(error))
-
-        @bot.message_handler(commands=Commands.STATS.names)
-        def stats(message):
-            try:
-                if message.from_user.username in lc.config["usernames"]:
-                    print("Sending Stats To Owner")
-                    with open("joined_groups.txt") as file:
-                        group_ids = []
-                        for line in file.readlines():
-                            for group_id in line.split(" "):
-                                group_ids.append(group_id)
-                                no_of_polls = len(group_ids)
-                                no_of_groups = len(list(set(group_ids)))
-                        group_ids.clear()
-                        bot.reply_to(
-                            message,
-                            f"Number of polls Made: {no_of_polls}\n#Nr of groups bot has been added to: {no_of_groups}",
+            elif cmd == "no":
+                self.process_generic_leistungsmessage(
+                    call.message.reply_to_message,
+                    val,
+                )
+            elif cmd == "poll_date":
+                if val:
+                    if not self.poller:
+                        self.helper.bot.send_message(
+                            call.message.chat_id,
+                            "Da is wohl was schiefglaufen, i kann ka poll findn...",
                         )
-                        file.close()
+                    else:
+                        self.check_open_hours_before_sending(
+                            call,
+                            datetime.strptime(
+                                val,
+                                self.helper.dateformat,
+                            ).date(),
+                        )
                 else:
-                    bot.reply_to(
-                        message,
-                        f"Sorry {message.from_user.username}! You Are Not Allowed To Use This Command,",
-                    )
-            except Exception as error:
-                try:
-                    group_ids.clear()
-                except BaseException:
-                    pass
-                self.helper.report_error(message, error)
+                    self.helper.pick_date(call.message.chat.id)
+            elif cmd == "open_hours_checked":
+                self.process_check_open_hours(call, val)
+            else:
+                self.bot.send_message(
+                    lc.config["chat_id"],
+                    f"Hi Devs!!\nHandle this callback\n{cmd}",
+                )
+            self.bot.edit_message_reply_markup(
+                call.message.chat.id,
+                call.message.message_id,
+            )
+        except Exception as error:
+            self.helper.report_error(call.message, error)
 
-        @bot.message_handler(commands=Commands.BOTLOGS.names)
-        def ViewTheLogsFile(message):
-            try:
-                if message.from_user.username in lc.config["usernames"]:
-                    print("Owner Asked For The Logs!")
-                    file = open("POLL_LOGS.txt")
-                    bot.send_document(
-                        message.chat.id,
-                        file,
-                        timeout=60,
-                        disable_notification=True,
+    def showIds(self, message):
+        try:
+            if message.from_user.username in lc.config["usernames"]:
+                file = open("joined_groups.txt", "r ")
+                self.bot.send_document(message.chat.id, file)
+                file.close()
+
+        except Exception as error:
+            self.bot.send_message(lc.config["chat_id"], str(error))
+
+    def stats(self, message):
+        try:
+            if message.from_user.username in lc.config["usernames"]:
+                print("Sending Stats To Owner")
+                with open("joined_groups.txt") as file:
+                    group_ids = []
+                    for line in file.readlines():
+                        for group_id in line.split(" "):
+                            group_ids.append(group_id)
+                            no_of_polls = len(group_ids)
+                            no_of_groups = len(list(set(group_ids)))
+                    group_ids.clear()
+                    self.bot.reply_to(
+                        message,
+                        f"Number of polls Made: {no_of_polls}\n#Nr of groups bot has been added to: {no_of_groups}",
                     )
                     file.close()
-                    print("Logs Sent To Owner")
-                else:
-                    bot.reply_to(
-                        message,
-                        f"Sorry {message.from_user.username}! You Are Not Allowed For This Command.",
-                    )
-            except Exception as error:
-                bot.reply_to(message, f"Error: {error}")
-
-        @bot.message_handler(commands=Commands.HELP.names)
-        def helper(message):
-            try:
-                return bot.reply_to(
+            else:
+                self.bot.reply_to(
                     message,
-                    "Eiso i hüf da do ned...na guat, do host:\n\n"
-                    + Commands.help_text(self.access_of(message)),
+                    f"Sorry {message.from_user.username}! You Are Not Allowed To Use This Command,",
                 )
-            except Exception as error:
-                self.helper.report_error(message, error)
+        except Exception as error:
+            try:
+                group_ids.clear()
+            except BaseException:
+                pass
+            self.helper.report_error(message, error)
 
-        @bot.message_handler(commands=Commands.PURGE.names)
-        def purge(message):
+    def ViewTheLogsFile(self, message):
+        try:
+            if message.from_user.username in lc.config["usernames"]:
+                print("Owner Asked For The Logs!")
+                file = open("POLL_LOGS.txt")
+                self.bot.send_document(
+                    message.chat.id,
+                    file,
+                    timeout=60,
+                    disable_notification=True,
+                )
+                file.close()
+                print("Logs Sent To Owner")
+            else:
+                self.bot.reply_to(
+                    message,
+                    f"Sorry {message.from_user.username}! You Are Not Allowed For This Command.",
+                )
+        except Exception as error:
+            self.bot.reply_to(message, f"Error: {error}")
+
+    def help_command(self, message):
+        try:
+            return self.bot.reply_to(
+                message,
+                "Eiso i hüf da do ned...na guat, do host:\n\n"
+                + Commands.help_text(self.access_of(message)),
+            )
+        except Exception as error:
+            self.helper.report_error(message, error)
+
+    def purge(self, message):
+        if not self.helper.sender_has_permission(message):
+            self.bot.reply_to(
+                message,
+                "Diese Funktion ist nicht für den Pöbel gedacht.",
+            )
+            return
+        try:
+            self.process_purge(message)
+        except IndexError:
+            return self.bot.reply_to(
+                message,
+                f"""Lol!!! An error in the wild:
+                {message.text}
+
+                Which is invalid.
+                For more help use: /help
+                """,
+            )
+        except Exception as error:
+            self.helper.report_error(message, error)
+
+    def alive(self, message):
+        self.bot.reply_to(
+            message,
+            f"Hey {message.from_user.username}, Ready To Serve You in version {_version.__version__}",
+        )
+
+    def start(self, message):
+        self.bot.reply_to(
+            message,
+            f"Heya {message.from_user.username}, I am there to help you in polls. But this cmd is bit old try /help.",
+        )
+
+    def poll_now(self, message):
+        try:
             if not self.helper.sender_has_permission(message):
-                bot.reply_to(
+                self.bot.reply_to(
                     message,
                     "Diese Funktion ist nicht für den Pöbel gedacht.",
                 )
                 return
-            try:
-                self.process_purge(message)
-            except IndexError:
-                return bot.reply_to(
+            self.bot.set_state(
+                message.from_user.id,
+                LeistungsState.normalLocation,
+                message.chat.id,
+            )
+            self.bot.send_message(
+                message.chat.id,
+                "Schick de nexte location muaz",
+                reply_markup=self.helper.location_keyboard(),
+            )
+        except Exception as error:
+            self.helper.report_error(message, error)
+
+    def zusatz_poll(self, message):
+        try:
+            if not self.helper.sender_has_permission(message):
+                self.bot.reply_to(
                     message,
-                    f"""Lol!!! An error in the wild:
-                    {message.text}
-
-                    Which is invalid.
-                    For more help use: /help
-                    """,
+                    "Diese Funktion ist nicht für den Pöbel gedacht.",
                 )
-            except Exception as error:
-                self.helper.report_error(message, error)
+                return
+            self.bot.set_state(
+                message.from_user.id,
+                LeistungsState.zusatzLocation,
+                message.chat.id,
+            )
+            self.bot.send_message(
+                message.chat.id,
+                "Schick de nexte location muaz",
+                reply_markup=self.helper.location_keyboard(),
+            )
+        except Exception as error:
+            self.helper.report_error(message, error)
 
-        @bot.message_handler(commands=Commands.ALIVE.names)
-        def alive(message):
-            bot.reply_to(
-                message,
-                f"Hey {message.from_user.username}, Ready To Serve You in version {_version.__version__}",
+    def konkurrenz_poll(self, message):
+        try:
+            if not self.helper.sender_has_permission(message):
+                self.bot.reply_to(
+                    message,
+                    "Diese Funktion ist nicht für den Pöbel gedacht.",
+                )
+                return
+            self.bot.set_state(
+                message.from_user.id,
+                LeistungsState.konkurrenzLocation,
+                message.chat.id,
+            )
+            self.bot.send_message(
+                message.chat.id,
+                "Schick de nexte location muaz",
+                reply_markup=self.helper.location_keyboard(),
+            )
+        except Exception as error:
+            self.helper.report_error(message, error)
+
+    def send_reminder(self, message: telebot.types.Message):
+        try:
+            self.bot.set_state(
+                message.from_user.id,
+                LeistungsState.remindePoll,
+                message.chat.id,
             )
 
-        @bot.message_handler(commands=Commands.START.names)
-        def start(message):
-            bot.reply_to(
-                message,
-                f"Heya {message.from_user.username}, I am there to help you in polls. But this cmd is bit old try /help.",
-            )
+            if not self.helper.sender_has_permission(message):
+                self.bot.reply_to(
+                    message,
+                    "Diese Funktion ist nicht für den Pöbel gedacht.",
+                )
+                return
 
-        @bot.message_handler(commands=Commands.LEISTUNGSPOLL.names)
-        def poll_now(message):
-            try:
-                if not self.helper.sender_has_permission(message):
-                    self.bot.reply_to(
-                        message,
-                        "Diese Funktion ist nicht für den Pöbel gedacht.",
+            # print(f'Message: {message.text}')
+            command_parts = message.text.strip().split()
+
+            if len(command_parts) == 1:
+                self.bot.reply_to(
+                    message,
+                    "An welchen Poll wüst reminden?",
+                    reply_markup=self.helper.open_polls_button(),
+                )
+                return
+            else:
+                target_date_str = command_parts[1]
+
+                try:
+                    target_date = date.fromisoformat(target_date_str)
+                except BaseException:
+                    target_date = None
+                    self.bot.send_message(
+                        message.chat.id,
+                        f"Soi des a Datum sei? Schick ma wonn donn sowos wie {datetime.now().date().isoformat()}",
                     )
-                    return
-                self.bot.set_state(
-                    message.from_user.id,
-                    LeistungsState.normalLocation,
-                    message.chat.id,
-                )
-                self.bot.send_message(
-                    message.chat.id,
-                    "Schick de nexte location muaz",
-                    reply_markup=self.helper.location_keyboard(),
-                )
-            except Exception as error:
-                self.helper.report_error(message, error)
-
-        @bot.message_handler(commands=Commands.ZUSATZPOLL.names)
-        def zusatz_poll(message):
-            try:
-                if not self.helper.sender_has_permission(message):
-                    self.bot.reply_to(
-                        message,
-                        "Diese Funktion ist nicht für den Pöbel gedacht.",
-                    )
-                    return
-                self.bot.set_state(
-                    message.from_user.id,
-                    LeistungsState.zusatzLocation,
-                    message.chat.id,
-                )
-                self.bot.send_message(
-                    message.chat.id,
-                    "Schick de nexte location muaz",
-                    reply_markup=self.helper.location_keyboard(),
-                )
-            except Exception as error:
-                self.helper.report_error(message, error)
-
-        @bot.message_handler(commands=Commands.KONKURRENZPOLL.names)
-        def konkurrenz_poll(message):
-            try:
-                if not self.helper.sender_has_permission(message):
-                    self.bot.reply_to(
-                        message,
-                        "Diese Funktion ist nicht für den Pöbel gedacht.",
-                    )
-                    return
-                self.bot.set_state(
-                    message.from_user.id,
-                    LeistungsState.konkurrenzLocation,
-                    message.chat.id,
-                )
-                self.bot.send_message(
-                    message.chat.id,
-                    "Schick de nexte location muaz",
-                    reply_markup=self.helper.location_keyboard(),
-                )
-            except Exception as error:
-                self.helper.report_error(message, error)
-
-        @bot.message_handler(commands=Commands.SENDREMINDER.names)
-        def send_reminder(message: telebot.types.Message):
-            try:
-                self.bot.set_state(
-                    message.from_user.id,
-                    LeistungsState.remindePoll,
-                    message.chat.id,
-                )
-
-                if not self.helper.sender_has_permission(message):
-                    self.bot.reply_to(
-                        message,
-                        "Diese Funktion ist nicht für den Pöbel gedacht.",
-                    )
-                    return
-
-                # print(f'Message: {message.text}')
-                command_parts = message.text.strip().split()
-
-                if len(command_parts) == 1:
                     self.bot.reply_to(
                         message,
                         "An welchen Poll wüst reminden?",
                         reply_markup=self.helper.open_polls_button(),
                     )
-                    return
-                else:
-                    target_date_str = command_parts[1]
 
-                    try:
-                        target_date = date.fromisoformat(target_date_str)
-                    except BaseException:
-                        target_date = None
-                        self.bot.send_message(
-                            message.chat.id,
-                            f"Soi des a Datum sei? Schick ma wonn donn sowos wie {datetime.now().date().isoformat()}",
+                # print(f'Date: {target_date}')
+
+                if target_date is not None:
+                    successful = (
+                        self.try_remind_to_leistungstag_on_a_specific_date(
+                            message,
+                            target_date,
                         )
+                    )
+                    if not successful:
                         self.bot.reply_to(
                             message,
                             "An welchen Poll wüst reminden?",
                             reply_markup=self.helper.open_polls_button(),
                         )
 
-                    # print(f'Date: {target_date}')
+        except Exception as error:
+            self.bot.delete_state(message.from_user.id, message.chat.id)
 
-                    if target_date is not None:
-                        successful = (
-                            self.try_remind_to_leistungstag_on_a_specific_date(
-                                message,
-                                target_date,
-                            )
-                        )
-                        if not successful:
-                            self.bot.reply_to(
-                                message,
-                                "An welchen Poll wüst reminden?",
-                                reply_markup=self.helper.open_polls_button(),
-                            )
+            self.helper.report_error(message, error)
 
-            except Exception as error:
-                self.bot.delete_state(message.from_user.id, message.chat.id)
-
-                self.helper.report_error(message, error)
-
-        @bot.message_handler(commands=Commands.CLOSEPOLL.names)
-        def close_poll(message):
-            try:
-                if not self.helper.sender_has_permission(message):
-                    self.bot.reply_to(
-                        message,
-                        "Diese Funktion ist nicht für den Pöbel gedacht.",
-                    )
-                    return
-
-                self.bot.set_state(
-                    message.from_user.id,
-                    LeistungsState.closePoll,
-                    message.chat.id,
-                )
-                self.bot.reply_to(
-                    message,
-                    "Welchen Poll wüst closen?",
-                    reply_markup=self.helper.open_polls_button(),
-                )
-            except Exception as error:
-                self.helper.report_error(message, error)
-
-        @bot.message_handler(commands=Commands.SNEAKY_CLOSEPOLL.names)
-        def sneaky_close_poll(message: telebot.types.Message) -> None:
-            try:
-                if not self.helper.sender_has_permission(message):
-                    self.bot.reply_to(
-                        message,
-                        "Diese Funktion ist nicht für den Pöbel gedacht.",
-                    )
-                    return
-
-                self.bot.set_state(
-                    message.from_user.id,
-                    LeistungsState.sneakyClosePoll,
-                    message.chat.id,
-                )
-                self.bot.reply_to(
-                    message,
-                    "Welchen Poll wüst sneaky closen?",
-                    reply_markup=self.helper.open_polls_button(),
-                )
-            except Exception as error:
-                self.helper.report_error(message, error)
-
-        @bot.message_handler(commands=Commands.SENDNUDES.names)
-        def send_nudes(message):
-            try:
-                if message.chat.type != "private":
-                    bot.reply_to(
-                        message,
-                        "Bist deppad? Des is nix fürn Gruppen chat, du Drecksau.",
-                    )
-                else:
-                    self.process_send_nudes(message.chat.id)
-            except Exception as error:
-                self.helper.report_error(message, error)
-
-        @bot.message_handler(commands=Commands.ADD_LOCATION.names)
-        def add_location(message):
-            try:
-                self.bot.set_state(
-                    message.from_user.id,
-                    LeistungsState.searchLocation,
-                    message.chat.id,
-                )
-                self.bot.send_message(
-                    message.chat.id,
-                    "Schick dei location idee muaz",
-                )
-            except Exception as error:
-                self.helper.report_error(message, error)
-
-        @bot.message_handler(commands=Commands.BACKUP.names)
-        def backup(message):
-            try:
-                if not self.helper.sender_has_permission(message):
-                    self.bot.reply_to(
-                        message,
-                        "Diese Funktion ist nicht für den Pöbel gedacht.",
-                    )
-                    return
-
-                self.bot.reply_to(message, "I grab da de Datenbank zaum ...")
-                self.helper.send_backup(message.chat.id)
-            except Exception as error:
-                self.helper.report_error(message, error)
-
-        @bot.message_handler(commands=Commands.REMOVE_LOCATION.names)
-        def remove_location_handler(message):
-            try:
-                if not self.helper.sender_has_permission(message):
-                    self.bot.reply_to(
-                        message,
-                        "Diese Funktion ist nicht für den Pöbel gedacht.",
-                    )
-                    return
-
-                self.bot.set_state(
-                    message.from_user.id,
-                    LeistungsState.removeLocation,
-                    message.chat.id,
-                )
-                self.bot.reply_to(
-                    message,
-                    "Welche Location willst löschen?",
-                    reply_markup=self.helper.location_keyboard(),
-                )
-            except Exception as error:
-                self.helper.report_error(message, error)
-
-        @bot.message_handler(commands=Commands.HISTORY.names)
-        def history(message):
-            try:
-                self.process_history(message)
-            except Exception as error:
-                self.helper.report_error(message, error)
-
-        @bot.message_handler(commands=Commands.RATE_LOCATION.names)
-        def rate_location_handler(message):
-            try:
-                if message.chat.type != "private":
-                    self.helper.bot.reply_to(
-                        message,
-                        "Und wenn ma des ned im Gruppenchat machen, du Bauernschädl?",
-                    )
-                else:
-                    leistungstag = self.helper.db.getLeistungsTags(
-                        LeistungsTyp.NORMAL,
-                        max_results=1,
-                        before=datetime.now(),
-                    )[0]
-                    self.helper.send_location_info2(
-                        message.chat.id,
-                        leistungstag["location"],
-                    )
-                    self.helper.bot.send_message(
-                        message.chat.id,
-                        "Wiafü Monde wüst erm geben?",
-                        reply_markup=self.helper.rating_keyboard(),
-                    )
-                    self.bot.set_state(
-                        message.from_user.id,
-                        LeistungsState.rateLocation,
-                        message.chat.id,
-                    )
-            except Exception as error:
-                self.helper.report_error(message, error)
-
-        @bot.message_handler(commands=Commands.SHOW_LOCATIONS.names)
-        def show_locations(message):
-            try:
-                bot.reply_to(
-                    message,
-                    "Des san de nächsten Locations",
-                    reply_markup=self.helper.virgine_location_button(),
-                )
-            except Exception as error:
-                self.helper.report_error(message, error)
-
-        @bot.message_handler(commands=Commands.MESSAGE.names)
-        def message_handler(message: telebot.types.Message):
-            try:
-                self.bot.set_state(
-                    message.from_user.id,
-                    LeistungsState.remindePoll,
-                    message.chat.id,
-                )
-
-                if not self.helper.sender_has_permission(message):
-                    self.bot.reply_to(
-                        message,
-                        "Diese Funktion ist nicht für den Pöbel gedacht.",
-                    )
-                    return
-
-                # print(f'Message: {message.text}')
-                command_parts = message.text.strip().split()
-                if len(command_parts) < 2:
-                    self.bot.reply_to(
-                        message,
-                        "Jo, do muast jetzt scho dazuaschreiben wost willst. Probiers numoi",
-                    )
-                    return
-
-                self.bot.set_state(
-                    message.from_user.id,
-                    LeistungsState.genericLeistungsmessage,
-                    message.chat.id,
-                )
-
-                self.bot.reply_to(
-                    message,
-                    "Wüst des auf irgend an poll replyen?",
-                    reply_markup=self.helper.open_polls_button(True),
-                )
-
-            except Exception as error:
-                self.helper.report_error(message, error)
-
-        @bot.message_handler(state="*", commands=Commands.CANCEL.names)
-        def cancel(message):
-            try:
-                self.process_cancle(message)
-            except Exception as error:
-                self.helper.report_error(message, error)
-
-        @bot.message_handler(state=LeistungsState.normalLocation)
-        def get_poll_location(message):
-            try:
-                location = self.process_poll_location(message)
-                if location:
-                    self.poller = PersistantLeistungsTagPoller(
-                        self.helper,
-                        message.chat.id,
-                        location,
-                        LeistungsTyp.NORMAL,
-                    )
-                    self.helper.bot.reply_to(
-                        message,
-                        "Für wann wollen ma pollen?",
-                        reply_markup=self.helper.date_suggester(),
-                    )
-            except Exception as error:
-                self.helper.report_error(message, error)
-
-        @bot.message_handler(state=LeistungsState.konkurrenzLocation)
-        def get_konkurrenz_location(message):
-            try:
-                location = self.process_poll_location(message)
-                if location:
-                    self.poller = PersistantLeistungsTagPoller(
-                        self.helper,
-                        message.chat.id,
-                        location,
-                        LeistungsTyp.KONKURENZ,
-                    )
-                    self.helper.bot.reply_to(
-                        message,
-                        "Für wann wollen ma pollen?",
-                        reply_markup=self.helper.date_suggester(),
-                    )
-            except Exception as error:
-                self.helper.report_error(message, error)
-
-        @bot.message_handler(state=LeistungsState.zusatzLocation)
-        def get_zusatz_location(message):
-            try:
-                location = self.process_poll_location(message)
-                if location:
-                    self.poller = PersistantLeistungsTagPoller(
-                        self.helper,
-                        message.chat.id,
-                        location,
-                        LeistungsTyp.ZUSATZ,
-                    )
-                    self.helper.pick_date(message.chat.id)
-            except Exception as error:
-                self.helper.report_error(message, error)
-
-        @bot.message_handler(state=LeistungsState.removeLocation)
-        def remove_location(message):
-            try:
-                self.helper.remove_location(message.text)
-                bot.reply_to(message, "Hab de location murz destroyed!")
-            except Exception as error:
-                self.helper.report_error(message, error)
-
-        @bot.message_handler(state=LeistungsState.searchLocation)
-        def search_location(message):
-            try:
-                self.process_search_location(
-                    message.chat.id,
-                    message.text.strip(),
-                )
-            except Exception as error:
-                self.helper.report_error(message, error)
-
-        @bot.message_handler(state=LeistungsState.rateLocation)
-        def rate_location(message):
-            try:
-                rating = self.helper.get_rating(message.text)
-                leistungstag = self.helper.db.getLeistungsTags(
-                    LeistungsTyp.NORMAL,
-                    max_results=1,
-                    before=datetime.now(),
-                )[0]
-                self.helper.db.addUser(message.from_user.id, message.chat.id)
-                try:
-                    self.helper.db.rateLocationKey(
-                        leistungstag["location"],
-                        message.from_user.id,
-                        rating,
-                    )
-                except BaseException:
-                    self.bot.send_message(
-                        message.chat.id,
-                        "WAHLBETRUG!! Du host schomoi obgstimmt.",
-                    )
-                self.bot.delete_state(message.from_user.id)
-            except Exception as error:
-                self.helper.report_error(message, error)
-
-        @bot.message_handler(state=LeistungsState.switcherooLeistungstagNumber)
-        def switcheroo_leistungstag_number(
-            message: telebot.types.Message,
-        ) -> None:
-            try:
-                lt_number = int(message.text)
-            except BaseException:
-                self.bot.send_message(
-                    message.chat.id,
-                    "Host du in da Voikschui ned aufpasst wos a nummer is? Probiers numoi ...",
-                )
-                return
-
-            lt = self.helper.db.getLeistungstagByNumber(lt_number)
-            if lt is None:
-                self.bot.send_message(
-                    message.chat.id,
-                    "Den Leistungstog find i ned. Schau numoi genau",
-                )
-                return
-
-            print(f'Location {lt["location"]}')
-
-            if message.from_user.id not in self.user_context:
-                self.user_context[message.from_user.id] = {"leistungstag": lt}
-            else:
-                self.user_context[message.from_user.id]["leistungstag"] = lt
-
-            self.bot.send_message(
-                message.chat.id,
-                "Passt. Wo schau ma stottdessen hin?",
-                reply_markup=self.helper.location_keyboard(),
-            )
-            self.bot.set_state(
-                message.from_user.id,
-                LeistungsState.switcherooAlternateLocation,
-                message.chat.id,
-            )
-
-        @bot.message_handler(state=LeistungsState.switcherooAlternateLocation)
-        def switcheroo_alternate_location(
-            message: telebot.types.Message,
-        ) -> None:
-            if (
-                message.from_user.id not in self.user_context
-                or "leistungstag"
-                not in self.user_context[message.from_user.id]
-                or self.user_context[message.from_user.id]["leistungstag"]
-                is None
-            ):
-                self.bot.send_message(
-                    message.chat.id,
-                    "Could not find Leistungstag in UserContext. This should not happen, please try again ...",
-                )
-                self.bot.delete_state(message.from_user.id, message.chat.id)
-                return
-
-            location = message.text.strip()
-            # check if location exists in database
-            info = self.helper.db.getLocationInfo(location)
-
-            if not info:
-                self.bot.send_message(
-                    message.chat.id,
-                    f"'{location}' kenn i ned..wüstas stattdessn zur listn dazua gebn?",
-                    reply_markup=self.helper.unkown_location_button(location),
-                )
-                self.bot.set_state(
-                    message.from_user.id,
-                    LeistungsState.searchLocation,
-                    message.chat.id,
-                )
-
-            else:
-                lt = self.user_context[message.from_user.id]["leistungstag"]
-                self.helper.db.switchLeistungstagLocation(
-                    lt["key"],
-                    lt["location"],
-                    info["key"],
-                )
-
-                self.bot.send_message(
-                    message.from_user.id,
-                    f"Ok, donn gemma am {lt['date'].strftime('%d.%m.%Y')} ins {info['name']}",
-                )
-                self.bot.delete_state(message.from_user.id, message.chat.id)
-
-            self.user_context[message.from_user.id]["leistungstag"] = None
-            # TODO: Edit poll message, if possible
-
-        @bot.message_handler(commands=Commands.SWITCHEROO.names)
-        def switcheroo(message: telebot.types.Message) -> None:
+    def close_poll(self, message):
+        try:
             if not self.helper.sender_has_permission(message):
                 self.bot.reply_to(
                     message,
@@ -933,42 +608,394 @@ class LeistungsBot:
                 )
                 return
 
+            self.bot.set_state(
+                message.from_user.id,
+                LeistungsState.closePoll,
+                message.chat.id,
+            )
+            self.bot.reply_to(
+                message,
+                "Welchen Poll wüst closen?",
+                reply_markup=self.helper.open_polls_button(),
+            )
+        except Exception as error:
+            self.helper.report_error(message, error)
+
+    def sneaky_close_poll(self, message: telebot.types.Message) -> None:
+        try:
+            if not self.helper.sender_has_permission(message):
+                self.bot.reply_to(
+                    message,
+                    "Diese Funktion ist nicht für den Pöbel gedacht.",
+                )
+                return
+
+            self.bot.set_state(
+                message.from_user.id,
+                LeistungsState.sneakyClosePoll,
+                message.chat.id,
+            )
+            self.bot.reply_to(
+                message,
+                "Welchen Poll wüst sneaky closen?",
+                reply_markup=self.helper.open_polls_button(),
+            )
+        except Exception as error:
+            self.helper.report_error(message, error)
+
+    def send_nudes(self, message):
+        try:
+            if message.chat.type != "private":
+                self.bot.reply_to(
+                    message,
+                    "Bist deppad? Des is nix fürn Gruppen chat, du Drecksau.",
+                )
+            else:
+                self.process_send_nudes(message.chat.id)
+        except Exception as error:
+            self.helper.report_error(message, error)
+
+    def add_location(self, message):
+        try:
+            self.bot.set_state(
+                message.from_user.id,
+                LeistungsState.searchLocation,
+                message.chat.id,
+            )
             self.bot.send_message(
                 message.chat.id,
-                "Wechan muastn ändern? Schick ma de nummer und i schau wos i doan konn.",
+                "Schick dei location idee muaz",
+            )
+        except Exception as error:
+            self.helper.report_error(message, error)
+
+    def backup(self, message):
+        try:
+            if not self.helper.sender_has_permission(message):
+                self.bot.reply_to(
+                    message,
+                    "Diese Funktion ist nicht für den Pöbel gedacht.",
+                )
+                return
+
+            self.bot.reply_to(message, "I grab da de Datenbank zaum ...")
+            self.helper.send_backup(message.chat.id)
+        except Exception as error:
+            self.helper.report_error(message, error)
+
+    def remove_location_handler(self, message):
+        try:
+            if not self.helper.sender_has_permission(message):
+                self.bot.reply_to(
+                    message,
+                    "Diese Funktion ist nicht für den Pöbel gedacht.",
+                )
+                return
+
+            self.bot.set_state(
+                message.from_user.id,
+                LeistungsState.removeLocation,
+                message.chat.id,
+            )
+            self.bot.reply_to(
+                message,
+                "Welche Location willst löschen?",
+                reply_markup=self.helper.location_keyboard(),
+            )
+        except Exception as error:
+            self.helper.report_error(message, error)
+
+    def history(self, message):
+        try:
+            self.process_history(message)
+        except Exception as error:
+            self.helper.report_error(message, error)
+
+    def rate_location_handler(self, message):
+        try:
+            if message.chat.type != "private":
+                self.helper.bot.reply_to(
+                    message,
+                    "Und wenn ma des ned im Gruppenchat machen, du Bauernschädl?",
+                )
+            else:
+                leistungstag = self.helper.db.getLeistungsTags(
+                    LeistungsTyp.NORMAL,
+                    max_results=1,
+                    before=datetime.now(),
+                )[0]
+                self.helper.send_location_info2(
+                    message.chat.id,
+                    leistungstag["location"],
+                )
+                self.helper.bot.send_message(
+                    message.chat.id,
+                    "Wiafü Monde wüst erm geben?",
+                    reply_markup=self.helper.rating_keyboard(),
+                )
+                self.bot.set_state(
+                    message.from_user.id,
+                    LeistungsState.rateLocation,
+                    message.chat.id,
+                )
+        except Exception as error:
+            self.helper.report_error(message, error)
+
+    def show_locations(self, message):
+        try:
+            self.bot.reply_to(
+                message,
+                "Des san de nächsten Locations",
+                reply_markup=self.helper.virgine_location_button(),
+            )
+        except Exception as error:
+            self.helper.report_error(message, error)
+
+    def message_command(self, message: telebot.types.Message):
+        try:
+            self.bot.set_state(
+                message.from_user.id,
+                LeistungsState.remindePoll,
+                message.chat.id,
+            )
+
+            if not self.helper.sender_has_permission(message):
+                self.bot.reply_to(
+                    message,
+                    "Diese Funktion ist nicht für den Pöbel gedacht.",
+                )
+                return
+
+            # print(f'Message: {message.text}')
+            command_parts = message.text.strip().split()
+            if len(command_parts) < 2:
+                self.bot.reply_to(
+                    message,
+                    "Jo, do muast jetzt scho dazuaschreiben wost willst. Probiers numoi",
+                )
+                return
+
+            self.bot.set_state(
+                message.from_user.id,
+                LeistungsState.genericLeistungsmessage,
+                message.chat.id,
+            )
+
+            self.bot.reply_to(
+                message,
+                "Wüst des auf irgend an poll replyen?",
+                reply_markup=self.helper.open_polls_button(True),
+            )
+
+        except Exception as error:
+            self.helper.report_error(message, error)
+
+    def cancel(self, message):
+        try:
+            self.process_cancle(message)
+        except Exception as error:
+            self.helper.report_error(message, error)
+
+    def get_poll_location(self, message):
+        try:
+            location = self.process_poll_location(message)
+            if location:
+                self.poller = PersistantLeistungsTagPoller(
+                    self.helper,
+                    message.chat.id,
+                    location,
+                    LeistungsTyp.NORMAL,
+                )
+                self.helper.bot.reply_to(
+                    message,
+                    "Für wann wollen ma pollen?",
+                    reply_markup=self.helper.date_suggester(),
+                )
+        except Exception as error:
+            self.helper.report_error(message, error)
+
+    def get_konkurrenz_location(self, message):
+        try:
+            location = self.process_poll_location(message)
+            if location:
+                self.poller = PersistantLeistungsTagPoller(
+                    self.helper,
+                    message.chat.id,
+                    location,
+                    LeistungsTyp.KONKURENZ,
+                )
+                self.helper.bot.reply_to(
+                    message,
+                    "Für wann wollen ma pollen?",
+                    reply_markup=self.helper.date_suggester(),
+                )
+        except Exception as error:
+            self.helper.report_error(message, error)
+
+    def get_zusatz_location(self, message):
+        try:
+            location = self.process_poll_location(message)
+            if location:
+                self.poller = PersistantLeistungsTagPoller(
+                    self.helper,
+                    message.chat.id,
+                    location,
+                    LeistungsTyp.ZUSATZ,
+                )
+                self.helper.pick_date(message.chat.id)
+        except Exception as error:
+            self.helper.report_error(message, error)
+
+    def remove_location(self, message):
+        try:
+            self.helper.remove_location(message.text)
+            self.bot.reply_to(message, "Hab de location murz destroyed!")
+        except Exception as error:
+            self.helper.report_error(message, error)
+
+    def search_location(self, message):
+        try:
+            self.process_search_location(
+                message.chat.id,
+                message.text.strip(),
+            )
+        except Exception as error:
+            self.helper.report_error(message, error)
+
+    def rate_location(self, message):
+        try:
+            rating = self.helper.get_rating(message.text)
+            leistungstag = self.helper.db.getLeistungsTags(
+                LeistungsTyp.NORMAL,
+                max_results=1,
+                before=datetime.now(),
+            )[0]
+            self.helper.db.addUser(message.from_user.id, message.chat.id)
+            try:
+                self.helper.db.rateLocationKey(
+                    leistungstag["location"],
+                    message.from_user.id,
+                    rating,
+                )
+            except BaseException:
+                self.bot.send_message(
+                    message.chat.id,
+                    "WAHLBETRUG!! Du host schomoi obgstimmt.",
+                )
+            self.bot.delete_state(message.from_user.id)
+        except Exception as error:
+            self.helper.report_error(message, error)
+
+    def switcheroo_leistungstag_number(
+        self,
+        message: telebot.types.Message,
+    ) -> None:
+        try:
+            lt_number = int(message.text)
+        except BaseException:
+            self.bot.send_message(
+                message.chat.id,
+                "Host du in da Voikschui ned aufpasst wos a nummer is? Probiers numoi ...",
+            )
+            return
+
+        lt = self.helper.db.getLeistungstagByNumber(lt_number)
+        if lt is None:
+            self.bot.send_message(
+                message.chat.id,
+                "Den Leistungstog find i ned. Schau numoi genau",
+            )
+            return
+
+        print(f'Location {lt["location"]}')
+
+        if message.from_user.id not in self.user_context:
+            self.user_context[message.from_user.id] = {"leistungstag": lt}
+        else:
+            self.user_context[message.from_user.id]["leistungstag"] = lt
+
+        self.bot.send_message(
+            message.chat.id,
+            "Passt. Wo schau ma stottdessen hin?",
+            reply_markup=self.helper.location_keyboard(),
+        )
+        self.bot.set_state(
+            message.from_user.id,
+            LeistungsState.switcherooAlternateLocation,
+            message.chat.id,
+        )
+
+    def switcheroo_alternate_location(
+        self,
+        message: telebot.types.Message,
+    ) -> None:
+        if (
+            message.from_user.id not in self.user_context
+            or "leistungstag" not in self.user_context[message.from_user.id]
+            or self.user_context[message.from_user.id]["leistungstag"] is None
+        ):
+            self.bot.send_message(
+                message.chat.id,
+                "Could not find Leistungstag in UserContext. This should not happen, please try again ...",
+            )
+            self.bot.delete_state(message.from_user.id, message.chat.id)
+            return
+
+        location = message.text.strip()
+        # check if location exists in database
+        info = self.helper.db.getLocationInfo(location)
+
+        if not info:
+            self.bot.send_message(
+                message.chat.id,
+                f"'{location}' kenn i ned..wüstas stattdessn zur listn dazua gebn?",
+                reply_markup=self.helper.unkown_location_button(location),
             )
             self.bot.set_state(
                 message.from_user.id,
-                LeistungsState.switcherooLeistungstagNumber,
+                LeistungsState.searchLocation,
                 message.chat.id,
             )
 
-        # @bot.message_handler(content_types=["text"])
-        # def new_msg(message):
-        #     try:
-        #         if "nude" in message.text:
-        #             if message.chat.type != "private":
-        #                 if (datetime.now() - self.last_text_nudes) > timedelta(
-        #                     days=1,
-        #                 ):
-        #                     self.last_text_nudes = datetime.now()
-        #                     self.process_send_nudes(message.chat.id)
-        #             else:
-        #                 self.process_send_nudes(message.chat.id)
-
-        #     except Exception as error:
-        #         bot.send_message(
-        #             lc.config["chat_id"],
-        #             f"Hi Devs!!\nHandle This Error (text)\n{error}",
-        #         )
-        #         bot.reply_to(message, f"An error occurred!\nError: {error}")
-
-        @bot.message_handler(commands=Commands.VERSION.names)
-        def version(message):
-            bot.reply_to(
-                message,
-                f"LeistungsBot - {_version.__version__}",
+        else:
+            lt = self.user_context[message.from_user.id]["leistungstag"]
+            self.helper.db.switchLeistungstagLocation(
+                lt["key"],
+                lt["location"],
+                info["key"],
             )
+
+            self.bot.send_message(
+                message.from_user.id,
+                f"Ok, donn gemma am {lt['date'].strftime('%d.%m.%Y')} ins {info['name']}",
+            )
+            self.bot.delete_state(message.from_user.id, message.chat.id)
+
+        self.user_context[message.from_user.id]["leistungstag"] = None
+
+    def switcheroo(self, message: telebot.types.Message) -> None:
+        if not self.helper.sender_has_permission(message):
+            self.bot.reply_to(
+                message,
+                "Diese Funktion ist nicht für den Pöbel gedacht.",
+            )
+            return
+
+        self.bot.send_message(
+            message.chat.id,
+            "Wechan muastn ändern? Schick ma de nummer und i schau wos i doan konn.",
+        )
+        self.bot.set_state(
+            message.from_user.id,
+            LeistungsState.switcherooLeistungstagNumber,
+            message.chat.id,
+        )
+
+    def version(self, message):
+        self.bot.reply_to(
+            message,
+            f"LeistungsBot - {_version.__version__}",
+        )
 
     def publish_commands(self) -> None:
         """! Hands the command list to telegram, for the in-app menu
