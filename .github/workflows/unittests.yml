@@ -1,7 +1,10 @@
 # The mocked unit tests. Database, google places and telegram are replaced by
-# test doubles, so this workflow needs no secrets, no MariaDB service and no
-# network - unlike `pytest.yml`, which does and therefore runs in the
+# test doubles, so this workflow needs no secrets, no database and no network
+# - unlike `integrationtests.yml`, which does and therefore runs in the
 # "My Environment" environment.
+#
+# This is the workflow that gates pull requests, including the per file
+# coverage floor.
 name: unittests
 on:
   push:

@@ -1,7 +1,14 @@
-# Run this job on pushes to `main`, and for pull requests. If you don't specify
-# `branches: [main], then this actions runs _twice_ on pull requests, which is
-# annoying.
-name: pytest
+# The integration tests: the real database, the real google places api and
+# the real telegram credentials, which is why this runs in the "My
+# Environment" environment and needs its approval before it starts.
+#
+# The mocked tests that gate every pull request are `unittests.yml`. This one
+# used to be called `pytest.yml`, which said which tool it ran rather than
+# what it tested, and read as if it were the test workflow.
+#
+# Runs on pushes to `main` and on pull requests. Without `branches: [main]`
+# it would run twice per pull request.
+name: integrationtests
 on:
   push:
     branches: [main]
