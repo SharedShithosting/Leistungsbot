@@ -178,6 +178,11 @@ def assert_not_said(app, snippet: str) -> None:
     ), f"did not expect a message containing {snippet!r}, got {texts!r}"
 
 
+def sent_documents(app) -> list[tuple[int, str | None, bytes]]:
+    """``(chat_id, visible_file_name, content)`` per document the bot sent."""
+    return app.documents
+
+
 def assert_no_dev_error(app) -> None:
     """Fail on the bot's catch-all error paths.
 

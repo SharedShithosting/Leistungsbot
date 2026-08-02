@@ -207,8 +207,22 @@ def app(monkeypatch, db, google, tmp_path):
     # their own order, which is not enough to tell which message came last.
     outbox: list[tuple[str, tuple, dict]] = []
 
+    # Documents are sent from a file handle that the bot closes and deletes
+    # right after, so their content has to be captured while it is being sent.
+    documents: list[tuple[int, str | None, bytes]] = []
+
     def recorder(name):
         def record(*args, **kwargs):
+            if name == "send_document" and len(args) > 1:
+                document = args[1]
+                if hasattr(document, "read"):
+                    documents.append(
+                        (
+                            args[0],
+                            kwargs.get("visible_file_name"),
+                            document.read(),
+                        ),
+                    )
             outbox.append((name, args, kwargs))
             return DEFAULT  # keep the mock's own return_value
 
@@ -228,6 +242,7 @@ def app(monkeypatch, db, google, tmp_path):
     lb.db = db
     lb.google = google
     lb.outbox = outbox
+    lb.documents = documents
     return lb
 
 
