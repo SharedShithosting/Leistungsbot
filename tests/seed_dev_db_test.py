@@ -166,6 +166,4 @@ def test_the_ids_are_obviously_not_real(seeder):
     ship a production dump instead.
     """
     assert all(user_id < 10_000 for user_id, _ in seeder.MEMBERS)
-    assert all(
-        chat_id is None or chat_id < 0 for _, chat_id in seeder.MEMBERS
-    )
+    assert all(chat_id is None or chat_id < 0 for _, chat_id in seeder.MEMBERS)

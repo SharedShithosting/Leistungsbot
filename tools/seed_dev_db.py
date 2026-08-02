@@ -51,6 +51,7 @@ def as_timestamp(value: datetime) -> str:
     """The format LeistungsDB stores timestamps in, sep=" " and all."""
     return value.isoformat(sep=" ")
 
+
 # type column of leistungstag, mirroring BotHelper.LeistungsTyp
 NORMAL, KONKURENZ, ZUSATZ = 1, 2, 3
 
