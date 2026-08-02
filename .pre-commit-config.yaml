@@ -21,37 +21,24 @@ repos:
     rev: v3.2.0
     hooks:
       - id: setup-cfg-fmt
-  - repo: https://github.com/asottile/reorder-python-imports
-    rev: v3.17.0
-    hooks:
-      - id: reorder-python-imports
-        exclude: ^(pre_commit/resources/|testing/resources/python3_hooks_repo/)
-        args: [--add-import, 'from __future__ import annotations']
   - repo: https://github.com/asottile/add-trailing-comma
     rev: v4.0.0
     hooks:
       - id: add-trailing-comma
-  - repo: https://github.com/asottile/pyupgrade
-    rev: v3.21.2
+  # Replaces reorder-python-imports, pyupgrade and flake8. Configured in
+  # pyproject.toml under [tool.ruff]; its isort agrees with black by design,
+  # which is what the three hooks it replaced did not.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.1
     hooks:
-      - id: pyupgrade
-  # Pinned: black >= 26 puts a blank line after the module docstring, and
-  # reorder-python-imports v3.17.0 takes it away again, so the two rewrite
-  # each other forever and every run fails. 24.10.0 is also what
-  # pyproject.toml pins black to for local use. See #93.
+      - id: ruff-check
+        args: [--fix]
   - repo: https://github.com/psf/black-pre-commit-mirror
-    rev: 24.10.0
+    rev: 26.5.1
     hooks:
       - id: black
         args: ['--line-length=79']
         language_version: python3.11
-  - repo: https://github.com/pycqa/flake8
-    rev: 7.3.0
-    hooks:
-      - id: flake8
-        args:
-          - --extend-ignore
-          - E501
   - repo: https://github.com/google/yamlfmt
     rev: v0.21.0
     hooks:

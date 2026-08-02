@@ -25,8 +25,8 @@ from telebot.types import InlineKeyboardButton
 from telebot.types import InlineKeyboardMarkup
 from telebot.types import KeyboardButton
 from telebot.types import ReplyKeyboardMarkup
-from telegram_bot_calendar import DetailedTelegramCalendar
 from telegram_bot_calendar import LSTEP
+from telegram_bot_calendar import DetailedTelegramCalendar
 
 from leistungsbot import leistungs_config as lc
 from leistungsbot.google_place import Places
@@ -323,7 +323,7 @@ class Helper:
         return sender.status == "administrator" or sender.status == "creator"
 
     def send_nude(self, chat_id):
-        gif = "https://cdn.porngifs.com/img/%s" % (random.randint(1, 39239))
+        gif = f"https://cdn.porngifs.com/img/{random.randint(1, 39239)}"
         self.bot.send_animation(
             chat_id,
             gif,

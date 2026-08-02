@@ -27,11 +27,11 @@ leistungsbot = "leistungsbot.__main__:main"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.2"
-black = "24.4.2"
+black = "26.5.1"
 pre-commit = "^3.8.0"
 genbadge = {extras = ["all"], version = "^1.1.1"}
 coverage = "^7.6.1"
-flake8 = "^7.1.1"
+ruff = "^0.16.1"
 
 
 [tool.poetry.requires-plugins]
@@ -47,6 +47,24 @@ build-backend = "poetry_dynamic_versioning.backend"
 
 [tool.mypy]
 disallow_untyped_defs = true
+
+
+[tool.ruff]
+line-length = 79
+target-version = "py311"
+
+[tool.ruff.lint]
+# E,F  what flake8 checked    I   what reorder-python-imports did
+# UP   what pyupgrade did     B   bugbear, cheap and catches real mistakes
+select = ["E", "F", "I", "UP", "B"]
+# black owns line length, same as the old flake8 --extend-ignore E501
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+# one import per line, and the __future__ import on top, which is how
+# reorder-python-imports left this code base
+force-single-line = true
+required-imports = ["from __future__ import annotations"]
 
 
 [tool.coverage.run]

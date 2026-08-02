@@ -9,13 +9,14 @@
 Both pick an open poll from a button list; the sneaky variant does the same
 thing but tells nobody in the leistungschat.
 """
+
 from __future__ import annotations
 
 import pytest
 
 from tests import support
-from tests.fixtures import make_leistungstag
 from tests.fixtures import POLL_MESSAGE_ID
+from tests.fixtures import make_leistungstag
 
 OPEN_KEY = 10
 PUBLIC_CLOSE_MESSAGE = "Schluss, aus, vorbei"

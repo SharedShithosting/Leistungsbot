@@ -21,8 +21,8 @@ from telebot import custom_filters
 from telebot.handler_backends import State
 from telebot.handler_backends import StatesGroup
 from telebot.storage import StateMemoryStorage
-from telegram_bot_calendar import DetailedTelegramCalendar
 from telegram_bot_calendar import LSTEP
+from telegram_bot_calendar import DetailedTelegramCalendar
 
 from leistungsbot import _version
 from leistungsbot import leistungs_config as lc

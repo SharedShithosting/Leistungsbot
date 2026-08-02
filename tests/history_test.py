@@ -8,6 +8,7 @@
 
 /history -> 🍻history_type (typ) -> 🍻history (leistungstag) -> info card
 """
+
 from __future__ import annotations
 
 import pytest

@@ -21,6 +21,7 @@ to a placeholder when nothing is configured, and that test skips.
 The database is a file in a temporary directory, so a test run can never
 touch a real one.
 """
+
 from __future__ import annotations
 
 import os

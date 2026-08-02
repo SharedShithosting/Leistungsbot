@@ -8,6 +8,7 @@
 
 /add_location -> query -> 🍻search (pick) -> 🍻select (confirm) -> db
 """
+
 from __future__ import annotations
 
 from leistungsbot.leistungs_returns import LeistungsReturnCodes

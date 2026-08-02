@@ -10,8 +10,10 @@ With SQLite there is no server to reach, so these are ordinary unit tests
 that run everywhere - the whole file used to need a MariaDB and was skipped
 almost everywhere it ran.
 """
+
 from __future__ import annotations
 
+import sqlite3
 from datetime import date
 from datetime import datetime
 from unittest.mock import MagicMock
@@ -99,7 +101,7 @@ def test_reopening_keeps_the_data(db):
 
 
 def test_foreign_keys_are_enforced(db):
-    with pytest.raises(Exception):
+    with pytest.raises(sqlite3.IntegrityError):
         db.cursor().execute(
             'INSERT INTO "leistungstag" '
             '("location", "date", "poll_id", "venue_id", "type") '
@@ -210,7 +212,7 @@ def test_rating_twice_is_refused(db):
     db.addUser(42)
     db.rateLocation("Bar A", 42, 4)
 
-    with pytest.raises(Exception):
+    with pytest.raises(sqlite3.IntegrityError):
         db.rateLocation("Bar A", 42, 5)
 
 

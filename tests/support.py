@@ -11,6 +11,7 @@ The tests drive the bot the way telegram does - by pushing ``Message`` /
 knows the name of a handler function, so handlers may be renamed, moved or
 regrouped during a refactor without touching the tests.
 """
+
 from __future__ import annotations
 
 import json

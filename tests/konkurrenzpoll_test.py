@@ -5,6 +5,7 @@
 #  this stuff is worth it, you can buy me a beer in return Poul-Henning Kamp  #
 # #############################################################################
 """/konkurrenzpoll - same flow as /leistungspoll, different type and wording."""
+
 from __future__ import annotations
 
 from leistungsbot.BotHelper import LeistungsTyp

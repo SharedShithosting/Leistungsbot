@@ -8,11 +8,12 @@
 
 /message <text> -> pick a poll to reply to (or "Nö") -> leistungschat
 """
+
 from __future__ import annotations
 
 from tests import support
-from tests.fixtures import make_leistungstag
 from tests.fixtures import POLL_MESSAGE_ID
+from tests.fixtures import make_leistungstag
 
 COMMAND = "/message Heit gemma auf a Bier"
 TEXT = "Heit gemma auf a Bier"

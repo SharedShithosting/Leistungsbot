@@ -7,8 +7,8 @@
 from __future__ import annotations
 
 import datetime
-from enum import auto
 from enum import Enum
+from enum import auto
 
 import googlemaps
 

@@ -80,10 +80,12 @@ jobs:
       - run: poetry run coverage html -d reports/coverage
       # Generate badges
       - run: poetry run genbadge coverage -o reports/badges/coverage-badge.svg
-      # flake8
-      - run: poetry run flake8 leistungsbot --exit-zero --format=html --htmldir ./reports/flake8 --statistics --tee --output-file reports/flake8/flake8stats.txt
-      # Generate badges
-      - run: poetry run genbadge flake8 -o reports/badges/flake8-badge.svg
+      # lint report. genbadge can only read flake8's statistics format, and
+      # ruff does not produce it, so this is a report without a badge.
+      - run: |
+          mkdir -p reports/ruff
+          poetry run ruff check leistungsbot \
+            --output-format=github --exit-zero | tee reports/ruff/ruff.txt
       - name: Archive badges
         if: "${{ github.ref_name  == 'main' }}" # This step will only run if `[deploy]` is found
         uses: actions/upload-artifact@v4
