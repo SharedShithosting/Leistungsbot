@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import pickle
 import random
@@ -18,6 +19,7 @@ from datetime import timedelta
 from enum import IntEnum
 
 import telebot
+from telebot.apihelper import ApiTelegramException
 from telebot.types import InlineKeyboardButton
 from telebot.types import InlineKeyboardMarkup
 from telebot.types import KeyboardButton
@@ -569,40 +571,58 @@ class Helper:
         self.db.removeLeistungstag(leistungstag_key)
         return res
 
-    def excep(self, msg, error):
-        self.bot.send_message(
-            lc.config["chat_id"],
-            f"""Error From Poll Bot!
+    def migrated_chat_id(self, error) -> int | None:
+        """! The new chat id after a group was upgraded to a supergroup
 
-Error  :: {error}
+        Telegram answers every request to the old id with a 400 and hands the
+        replacement id back in `parameters.migrate_to_chat_id`.
 
---------------------------------
+        @returns The new chat id, or None if this is not a migration error
+        """
+        if not isinstance(error, ApiTelegramException):
+            return None
+        parameters = (error.result_json or {}).get("parameters", {})
+        return parameters.get("migrate_to_chat_id")
 
-Command:: {msg.text}
+    def report_error(self, message, error) -> None:
+        """! Reports a failed command to the user and to the dev chat
 
---------------------------------
+        Never raises. The reporter used to be inlined in every handler, so
+        when it failed - a stale chat id in the configuration is enough - its
+        own exception replaced the one it was meant to report, and the
+        original cause was lost.
 
-UserDetails: {msg.from_user}
+        @param message Message that triggered the failing command
+        @param error The exception that was caught
+        """
+        logging.exception("command failed: %s", getattr(message, "text", None))
 
---------------------------------
+        hint = ""
+        migrated = self.migrated_chat_id(error)
+        if migrated:
+            hint = (
+                f"\n\nDe Gruppn is a Supergruppe worden. "
+                f"Neue chat id: {migrated}\n"
+                f"De Konfiguration muas ogepasst wern, "
+                f"sunst geht goa nix mehr."
+            )
 
-Date   :: {msg.date}
+        try:
+            self.bot.reply_to(message, f"An error occurred!\nError: {error}")
+        except Exception:
+            logging.exception("could not tell the user about the error")
 
---------------------------------
-
-The Complete Detail:
-{msg}
-
-
-""",
+        details = (
+            f"Hi Devs!!\nHandle This Error plox\n{error}\n\n"
+            f"Command: {getattr(message, 'text', None)}\n"
+            f"User: {getattr(message, 'from_user', None)}\n"
+            f"Chat: {getattr(getattr(message, 'chat', None), 'id', None)}"
+            f"{hint}"
         )
-
-        return self.bot.reply_to(
-            self.message,
-            f"""An Unexpected Error Occured!
-Error::  {error}
-The error was informed to @eckphi""",
-        )
+        try:
+            self.bot.send_message(lc.config["chat_id"], details)
+        except Exception:
+            logging.exception("could not tell the devs about the error")
 
     def pick_date(self, chat_id):
         calendar, step = DetailedTelegramCalendar(

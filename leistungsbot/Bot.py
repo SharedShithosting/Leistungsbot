@@ -313,18 +313,7 @@ class LeistungsBot:
                     call.message.message_id,
                 )
             except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error plox\n{error}",
-                )
-                bot.reply_to(
-                    call.message,
-                    f"An error occurred!\nError: {error}",
-                )
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"An error occurred!\nError: {error}",
-                )
+                self.helper.report_error(call.message, error)
 
         @bot.message_handler(commands=["showIds"])
         def showIds(message):
@@ -361,19 +350,11 @@ class LeistungsBot:
                         f"Sorry {message.from_user.username}! You Are Not Allowed To Use This Command,",
                     )
             except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error plox\n{error}",
-                )
                 try:
                     group_ids.clear()
                 except BaseException:
                     pass
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"An error occurred!\nError: {error}",
-                )
+                self.helper.report_error(message, error)
 
         @bot.message_handler(commands=["botlogs"])
         def ViewTheLogsFile(message):
@@ -422,39 +403,7 @@ class LeistungsBot:
                     """,
                 )
             except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"""Error From Poll Bot!
-
-                    Error  :: {error}
-
-                    --------------------------------
-
-                    Command:: {message.text}
-
-                    --------------------------------
-
-                    UserDetails: {message.from_user}
-
-                    --------------------------------
-
-                    Date   :: {message.date}
-
-                    --------------------------------
-
-                    The Complete Detail:
-                    {message}
-
-
-                    """,
-                )
-
-                return bot.reply_to(
-                    message,
-                    f"""An Unexpected Error Occured!
-                    Error::  {error}
-                    The error was informed to @eckphi""",
-                )
+                self.helper.report_error(message, error)
 
         @bot.message_handler(commands=["alive"])
         def alive(message):
@@ -490,15 +439,7 @@ class LeistungsBot:
                     reply_markup=self.helper.location_keyboard(),
                 )
             except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error plox\n{error}",
-                )
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"An error occurred!\nError: {error}",
-                )
+                self.helper.report_error(message, error)
 
         @bot.message_handler(commands=["zusatzpoll"])
         def zusatz_poll(message):
@@ -520,15 +461,7 @@ class LeistungsBot:
                     reply_markup=self.helper.location_keyboard(),
                 )
             except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error plox\n{error}",
-                )
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"An error occurred!\nError: {error}",
-                )
+                self.helper.report_error(message, error)
 
         @bot.message_handler(commands=["konkurrenzpoll"])
         def konkurrenz_poll(message):
@@ -550,15 +483,7 @@ class LeistungsBot:
                     reply_markup=self.helper.location_keyboard(),
                 )
             except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error plox\n{error}",
-                )
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"An error occurred!\nError: {error}",
-                )
+                self.helper.report_error(message, error)
 
         @bot.message_handler(commands=["sendreminder"])
         def send_reminder(message: telebot.types.Message):
@@ -622,15 +547,7 @@ class LeistungsBot:
             except Exception as error:
                 self.bot.delete_state(message.from_user.id, message.chat.id)
 
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error plox\n{error}",
-                )
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"An error occurred!\nError: {error}",
-                )
+                self.helper.report_error(message, error)
 
         @bot.message_handler(commands=["closepoll"])
         def close_poll(message):
@@ -653,15 +570,7 @@ class LeistungsBot:
                     reply_markup=self.helper.open_polls_button(),
                 )
             except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error plox\n{error}",
-                )
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"An error occurred!\nError: {error}",
-                )
+                self.helper.report_error(message, error)
 
         @bot.message_handler(commands=["sneaky_closepoll"])
         def sneaky_close_poll(message: telebot.types.Message) -> None:
@@ -684,15 +593,7 @@ class LeistungsBot:
                     reply_markup=self.helper.open_polls_button(),
                 )
             except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error plox\n{error}",
-                )
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"An error occurred!\nError: {error}",
-                )
+                self.helper.report_error(message, error)
 
         @bot.message_handler(commands=["sendnudes"])
         def send_nudes(message):
@@ -705,15 +606,7 @@ class LeistungsBot:
                 else:
                     self.process_send_nudes(message.chat.id)
             except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error plox\n{error}",
-                )
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"An error occurred!\nError: {error}",
-                )
+                self.helper.report_error(message, error)
 
         @bot.message_handler(commands=["add_location"])
         def add_location(message):
@@ -728,15 +621,7 @@ class LeistungsBot:
                     "Schick dei location idee muaz",
                 )
             except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error plox\n{error}",
-                )
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"An error occurred!\nError: {error}",
-                )
+                self.helper.report_error(message, error)
 
         @bot.message_handler(commands=["backup"])
         def backup(message):
@@ -751,15 +636,7 @@ class LeistungsBot:
                 self.bot.reply_to(message, "I grab da de Datenbank zaum ...")
                 self.helper.send_backup(message.chat.id)
             except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error plox\n{error}",
-                )
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"An error occurred!\nError: {error}",
-                )
+                self.helper.report_error(message, error)
 
         @bot.message_handler(commands=["remove_location"])
         def remove_location_handler(message):
@@ -782,30 +659,14 @@ class LeistungsBot:
                     reply_markup=self.helper.location_keyboard(),
                 )
             except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error plox\n{error}",
-                )
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"An error occurred!\nError: {error}",
-                )
+                self.helper.report_error(message, error)
 
         @bot.message_handler(commands=["history"])
         def history(message):
             try:
                 self.process_history(message)
             except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error plox\n{error}",
-                )
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"An error occurred!\nError: {error}",
-                )
+                self.helper.report_error(message, error)
 
         @bot.message_handler(commands=["rate_location"])
         def rate_location_handler(message):
@@ -836,15 +697,7 @@ class LeistungsBot:
                         message.chat.id,
                     )
             except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error plox\n{error}",
-                )
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"An error occurred!\nError: {error}",
-                )
+                self.helper.report_error(message, error)
 
         @bot.message_handler(commands=["show_locations"])
         def show_locations(message):
@@ -855,15 +708,7 @@ class LeistungsBot:
                     reply_markup=self.helper.virgine_location_button(),
                 )
             except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error plox\n{error}",
-                )
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"An error occurred!\nError: {error}",
-                )
+                self.helper.report_error(message, error)
 
         @bot.message_handler(commands=["message"])
         def message_handler(message: telebot.types.Message):
@@ -903,30 +748,14 @@ class LeistungsBot:
                 )
 
             except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error plox\n{error}",
-                )
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"An error occurred!\nError: {error}",
-                )
+                self.helper.report_error(message, error)
 
         @bot.message_handler(state="*", commands=["cancel"])
         def cancel(message):
             try:
                 self.process_cancle(message)
             except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error plox\n{error}",
-                )
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"An error occurred!\nError: {error}",
-                )
+                self.helper.report_error(message, error)
 
         @bot.message_handler(state=LeistungsState.normalLocation)
         def get_poll_location(message):
@@ -945,15 +774,7 @@ class LeistungsBot:
                         reply_markup=self.helper.date_suggester(),
                     )
             except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error plox\n{error}",
-                )
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"An error occurred!\nError: {error}",
-                )
+                self.helper.report_error(message, error)
 
         @bot.message_handler(state=LeistungsState.konkurrenzLocation)
         def get_konkurrenz_location(message):
@@ -972,15 +793,7 @@ class LeistungsBot:
                         reply_markup=self.helper.date_suggester(),
                     )
             except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error plox\n{error}",
-                )
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"An error occurred!\nError: {error}",
-                )
+                self.helper.report_error(message, error)
 
         @bot.message_handler(state=LeistungsState.zusatzLocation)
         def get_zusatz_location(message):
@@ -995,15 +808,7 @@ class LeistungsBot:
                     )
                     self.helper.pick_date(message.chat.id)
             except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error plox\n{error}",
-                )
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"An error occurred!\nError: {error}",
-                )
+                self.helper.report_error(message, error)
 
         @bot.message_handler(state=LeistungsState.removeLocation)
         def remove_location(message):
@@ -1011,15 +816,7 @@ class LeistungsBot:
                 self.helper.remove_location(message.text)
                 bot.reply_to(message, "Hab de location murz destroyed!")
             except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error plox\n{error}",
-                )
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"An error occurred!\nError: {error}",
-                )
+                self.helper.report_error(message, error)
 
         @bot.message_handler(state=LeistungsState.searchLocation)
         def search_location(message):
@@ -1029,15 +826,7 @@ class LeistungsBot:
                     message.text.strip(),
                 )
             except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error (LeistungsState.searchLocation)\n{error}",
-                )
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"An error occurred!\nError: {error}",
-                )
+                self.helper.report_error(message, error)
 
         @bot.message_handler(state=LeistungsState.rateLocation)
         def rate_location(message):
@@ -1062,15 +851,7 @@ class LeistungsBot:
                     )
                 self.bot.delete_state(message.from_user.id)
             except Exception as error:
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"Hi Devs!!\nHandle This Error (LeistungsState.searchLocation)\n{error}",
-                )
-                bot.reply_to(message, f"An error occurred!\nError: {error}")
-                bot.send_message(
-                    lc.config["chat_id"],
-                    f"An error occurred!\nError: {error}",
-                )
+                self.helper.report_error(message, error)
 
         @bot.message_handler(state=LeistungsState.switcherooLeistungstagNumber)
         def switcheroo_leistungstag_number(

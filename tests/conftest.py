@@ -12,10 +12,16 @@ time.  The environment therefore has to be populated *before* anything from
 and not inside a fixture.
 
 The chat ids and the bot token are forced to fixed test values: the tests
-assert on them, so a developer's real configuration must not leak in.  The
-google api key is left alone if a usable one is configured, so that
-``google_place_test.py`` - the one test that really talks to google - keeps
-working locally and in CI.
+assert on them, so a developer's real configuration must not leak in.
+
+Two things are deliberately *not* forced, because the tests that use them
+talk to the real service and would break if we overwrote the credentials:
+
+* the google api key, used by ``google_place_test.py``
+* the mysql credentials, used by ``leistungs_db_integration_test.py``
+
+Both fall back to a placeholder when nothing is configured, and the tests
+that need them skip when they cannot connect.
 """
 from __future__ import annotations
 
@@ -31,6 +37,11 @@ TEST_ENV = {
     "LEISTUNGSBOT_LEISTUNGSCHAT_ID": "-1002",
     "LEISTUNGSBOT_LEISTUNGSADMIN_ID": "-1003",
     "LEISTUNGSBOT_USERNAMES": "eckphi",
+}
+
+# Only used when nothing real is configured - the integration test skips
+# rather than failing when it cannot reach a database.
+MYSQL_FALLBACK_ENV = {
     "LEISTUNGSBOT_MYSQL__HOST": "127.0.0.1",
     "LEISTUNGSBOT_MYSQL__DB": "leistungs_db",
     "LEISTUNGSBOT_MYSQL__USER": "leistungs_user",
@@ -52,6 +63,8 @@ def _google_key_is_configured() -> bool:
 PLACEHOLDER_GOOGLE_KEY = "AIzaPLACEHOLDER-no-google-api-key-configured"
 
 os.environ.update(TEST_ENV)
+for _key, _value in MYSQL_FALLBACK_ENV.items():
+    os.environ.setdefault(_key, _value)
 if not _google_key_is_configured():
     os.environ["LEISTUNGSBOT_GOOGLE"] = PLACEHOLDER_GOOGLE_KEY
 
