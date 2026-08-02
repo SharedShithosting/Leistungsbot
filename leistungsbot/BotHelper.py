@@ -315,12 +315,30 @@ class Helper:
         )
         return markup
 
-    def sender_has_permission(self, msg):
-        sender = self.bot.get_chat_member(
+    def user_has_permission(self, user_id: int) -> bool:
+        """! Whether `user_id` is an administrator of the leistungschat
+
+        Takes the id rather than a message, because the person to check is
+        not always the author of one. An inline button sits on a message the
+        bot itself sent, so a callback has to pass `call.from_user.id` - see
+        `sender_has_permission` and #99.
+        """
+        member = self.bot.get_chat_member(
             lc.config["leistungschat_id"],
-            msg.from_user.id,
+            user_id,
         )
-        return sender.status == "administrator" or sender.status == "creator"
+        return member.status == "administrator" or member.status == "creator"
+
+    def sender_has_permission(self, msg):
+        """! Whether the author of `msg` may run an admin command
+
+        Only for messages a *person* sent. Do not pass the message an inline
+        keyboard sits on: that one was sent by the bot, so this would ask
+        whether the bot is an administrator - which it is, it has to pin and
+        stop polls, and the answer would be yes for everybody (#99). Use
+        `user_has_permission(call.from_user.id)` there.
+        """
+        return self.user_has_permission(msg.from_user.id)
 
     def send_nude(self, chat_id):
         gif = f"https://cdn.porngifs.com/img/{random.randint(1, 39239)}"

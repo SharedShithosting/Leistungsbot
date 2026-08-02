@@ -129,12 +129,6 @@ class PollLifecycleHandlers:
             self.helper.report_error(message, error)
 
     def purge(self, message):
-        if not self.helper.sender_has_permission(message):
-            self.bot.reply_to(
-                message,
-                "Diese Funktion ist nicht für den Pöbel gedacht.",
-            )
-            return
         try:
             self.process_purge(message)
         except IndexError:
@@ -249,8 +243,25 @@ class PollLifecycleHandlers:
 
         context.leistungstag = None
 
-    def process_reminder(self, message, leistungstag_key):
-        if not self.helper.sender_has_permission(message):
+    def process_reminder(
+        self,
+        message,
+        leistungstag_key,
+        user_id: int | None = None,
+    ) -> None:
+        """! Sends the reminder for `leistungstag_key`
+
+        @param message Where to answer
+        @param leistungstag_key Which leistungstag to remind about
+        @param user_id Who asked, when that is not the author of `message`
+
+        `user_id` has to be passed from a callback: the message the button
+        sits on was sent by the bot, so checking its author asks whether the
+        bot is an administrator. See #99.
+        """
+        if user_id is None:
+            user_id = message.from_user.id
+        if not self.helper.user_has_permission(user_id):
             self.bot.reply_to(
                 message,
                 "Diese Funktion ist nicht für den Pöbel gedacht.",
@@ -270,14 +281,27 @@ class PollLifecycleHandlers:
         message: telebot.types.Message,
         leistungstag_key: int,
         sneaky: bool = False,
+        user_id: int | None = None,
     ) -> None:
-        # Check does not work when in callback
-        # if not self.helper.sender_has_permission(message):
-        #     self.bot.reply_to(
-        #         message,
-        #         "Diese Funktion ist nicht für den Pöbel gedacht.",
-        #     )
-        #     return
+        """! Ends the voting for `leistungstag_key`
+
+        @param message Where to answer
+        @param leistungstag_key Which poll to close
+        @param sneaky Close it without telling the leistungschat
+        @param user_id Who asked, when that is not the author of `message`
+
+        The check here used to be commented out as "does not work when in
+        callback" - it did not, because it was handed the message the button
+        sits on, which the bot sent. Hence `user_id`. See #99.
+        """
+        if user_id is None:
+            user_id = message.from_user.id
+        if not self.helper.user_has_permission(user_id):
+            self.bot.reply_to(
+                message,
+                "Diese Funktion ist nicht für den Pöbel gedacht.",
+            )
+            return
 
         leistungstag = self.helper.db.getLeistungstag(leistungstag_key)
         self.helper.db.closeLeistungstag(leistungstag_key)
@@ -313,7 +337,25 @@ class PollLifecycleHandlers:
                     caption="De Poll is zua. I hoff für dich d Reservierung is scho erledigt!",
                 )
 
-    def process_purge(self, message):
+    def process_purge(self, message, user_id: int | None = None) -> None:
+        """! Opens the delete-a-leistungstag flow
+
+        @param message Where to answer
+        @param user_id Who asked, when that is not the author of `message`
+
+        The check sits here rather than in `purge`, so it holds for every
+        caller - a callback that ends up here has to pass the presser, the
+        author of `message` is the bot. See #99.
+        """
+        if user_id is None:
+            user_id = message.from_user.id
+        if not self.helper.user_has_permission(user_id):
+            self.bot.reply_to(
+                message,
+                "Diese Funktion ist nicht für den Pöbel gedacht.",
+            )
+            return
+
         with assets.gif("responisibility.gif") as responisibility:
             self.bot.send_animation(
                 message.chat.id,

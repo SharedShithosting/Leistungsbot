@@ -248,19 +248,38 @@ def app(monkeypatch, db, google, tmp_path):
 
     lb.bot.send_poll.return_value = MagicMock(message_id=POLL_MESSAGE_ID)
     lb.bot.send_venue.return_value = MagicMock(message_id=VENUE_MESSAGE_ID)
-    lb.bot.get_chat_member.return_value = MagicMock(status="administrator")
+
+    # Who telegram calls an administrator of the leistungschat, per user id.
+    # One blanket answer for everybody would hide #99: the bot itself is an
+    # administrator in the usual setup - it has to pin and stop polls - so a
+    # check aimed at the bot instead of at the presser passes for anyone.
+    # Everybody is an admin unless a test says otherwise, the bot included.
+    plebs: set[int] = set()
+    record = recorder("get_chat_member")
+
+    def chat_member(chat_id, user_id):
+        record(chat_id, user_id)
+        return MagicMock(
+            status="member" if user_id in plebs else "administrator",
+        )
+
+    lb.bot.get_chat_member.side_effect = chat_member
 
     lb.db = db
     lb.google = google
     lb.outbox = outbox
     lb.documents = documents
+    lb.plebs = plebs
     return lb
 
 
 @pytest.fixture
 def pleb(app):
-    """Demote the sender: not an admin of the leistungschat."""
-    app.bot.get_chat_member.return_value = MagicMock(status="member")
+    """Demote the sender: not an admin of the leistungschat.
+
+    The bot stays one, which is the setup #99 is about.
+    """
+    app.plebs.add(support.ADMIN_USER_ID)
     return app
 
 
