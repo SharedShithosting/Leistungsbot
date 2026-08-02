@@ -78,6 +78,26 @@ jobs:
       - run: poetry run coverage report -m
       - run: poetry run coverage xml -o reports/coverage/coverage.xml
       - run: poetry run coverage html -d reports/coverage
+      - run: poetry run coverage json -o reports/coverage/coverage.json
+      # Every file has to clear 75%, not just the project as a whole - a
+      # module with no tests at all hides behind a good total otherwise.
+      - name: Per file coverage gate
+        run: poetry run python tools/check_coverage.py reports/coverage/coverage.json
+      # Readable without downloading anything: this lands on the run's
+      # summary page, under the job list.
+      - name: Coverage summary
+        if: always()
+        run: |
+          {
+            echo "## Coverage"
+            echo
+            echo '```'
+            # `|| true`: coverage report exits nonzero under fail_under, and
+            # the summary should still render when it does. The gate above
+            # is what fails the build.
+            poetry run coverage report -m || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
       # Generate badges
       - run: poetry run genbadge coverage -o reports/badges/coverage-badge.svg
       # lint report. genbadge can only read flake8's statistics format, and
@@ -86,9 +106,15 @@ jobs:
           mkdir -p reports/ruff
           poetry run ruff check leistungsbot \
             --output-format=github --exit-zero | tee reports/ruff/ruff.txt
-      - name: Archive badges
-        if: "${{ github.ref_name  == 'main' }}" # This step will only run if `[deploy]` is found
+      # Uploaded on every run, not just main. The html report is only worth
+      # generating if it can be fetched from the pull request that changed
+      # the numbers; before, it was built and thrown away.
+      # Download it from the run page, unzip, open coverage/index.html.
+      # Publishing it somewhere clickable is #39.
+      - name: Archive reports
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: tests-badge
+          name: coverage-report-${{ github.run_id }}
           path: reports
+          retention-days: 14

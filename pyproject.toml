@@ -91,6 +91,10 @@ required-imports = ["from __future__ import annotations"]
 [tool.coverage.run]
 source = ["leistungsbot"]
 branch = true
+omit = [
+  # the `python -m leistungsbot` shim, three lines that only call main()
+  "leistungsbot/__main__.py",
+]
 
 [tool.coverage.report]
 show_missing = true
@@ -100,3 +104,8 @@ exclude_also = [
   "if TYPE_CHECKING:",
   "raise NotImplementedError",
 ]
+
+# There is no per file equivalent of fail_under, so the 75% floor every
+# file has to clear lives in tools/check_coverage.py. This one keeps the
+# project total honest as well.
+fail_under = 75

@@ -17,10 +17,16 @@ class AdminHandlers:
     def showIds(self, message):
         try:
             if message.from_user.username in lc.config["usernames"]:
-                file = open("joined_groups.txt", "r ")
-                self.bot.send_document(message.chat.id, file)
-                file.close()
-
+                # the mode used to be "r " - with a trailing space, which is
+                # not a valid mode, so this raised ValueError every time and
+                # the command had never once sent anything
+                with open("joined_groups.txt") as file:
+                    self.bot.send_document(message.chat.id, file)
+            else:
+                self.bot.reply_to(
+                    message,
+                    f"Sorry {message.from_user.username}! You Are Not Allowed To Use This Command,",
+                )
         except Exception as error:
             self.bot.send_message(lc.config["chat_id"], str(error))
 
