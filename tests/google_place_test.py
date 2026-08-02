@@ -1,6 +1,16 @@
 from __future__ import annotations
 
+import pytest
+
 from leistungsbot import google_place as gp
+from leistungsbot import leistungs_config as lc
+from tests.conftest import PLACEHOLDER_GOOGLE_KEY
+
+# This test talks to the real google api - it can only run with a real key.
+pytestmark = pytest.mark.skipif(
+    lc.config is None or lc.config["google"] == PLACEHOLDER_GOOGLE_KEY,
+    reason="no google api key configured",
+)
 
 
 def test_find_place():

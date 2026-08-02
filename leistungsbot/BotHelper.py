@@ -416,6 +416,34 @@ class Helper:
             data[index]["name"],
         )
 
+    def backup_filename(self, now: datetime = None) -> str:
+        now = now if now else datetime.now()
+        return f"leistungsbot-backup-{now.strftime('%Y%m%d-%H%M%S')}.sql"
+
+    def send_backup(self, chat_id) -> str:
+        """! Dumps the database and sends it as a document
+
+        @param chat_id Chat that gets the dump
+
+        @returns The name the dump was sent under
+        """
+        name = self.backup_filename()
+        path = os.path.join(self.temp_dir, name)
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(self.db.dump())
+        try:
+            with open(path, "rb") as handle:
+                self.bot.send_document(
+                    chat_id,
+                    handle,
+                    visible_file_name=name,
+                    caption="Do host dei Backup. Pass guat drauf auf!",
+                    disable_notification=True,
+                )
+        finally:
+            os.remove(path)
+        return name
+
     def remove_location(self, locationname):
         key = self.db.getLocationKey(locationname)
         self.db.removeLocation(key)
