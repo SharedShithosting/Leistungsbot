@@ -49,7 +49,9 @@ def test_stats_is_refused_to_a_stranger(app, workdir):
 
 
 def test_stats_without_the_file_reports_instead_of_crashing(
-    app, monkeypatch, tmp_path
+    app,
+    monkeypatch,
+    tmp_path,
 ):
     monkeypatch.chdir(tmp_path)  # no joined_groups.txt here
 
