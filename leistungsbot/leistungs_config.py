@@ -32,7 +32,9 @@ template = {
             "provider": confuse.Optional(str, default="google"),
             "calendar_id": confuse.Optional(str, default=None),
             "credentials": confuse.Optional(str, default=None),
-            "timezone": confuse.Optional(str, default="Europe/Vienna"),
+            # no default: an unset zone is answered by TZ, and only then by
+            # Europe/Vienna. See leistungs_calendar.default_timezone.
+            "timezone": confuse.Optional(str, default=None),
         },
         default=None,
     ),
