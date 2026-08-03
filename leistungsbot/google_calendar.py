@@ -20,6 +20,7 @@ service account cannot create a calendar for itself.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -40,6 +41,15 @@ SCOPES = ["https://www.googleapis.com/auth/calendar"]
 #: default is zero retries, and the startup pass duly gave up on the first
 #: "Rate Limit Exceeded" google answered.
 RETRIES = 5
+
+#: Events per page when reading the calendar. 2500 is the most the api
+#: hands out at once, and the whole history of a group fits in one page.
+PAGE_SIZE = 2500
+
+#: What of an event is worth transferring. Everything this bot writes and
+#: nothing else - without a mask the api sends the full resource, which is
+#: some twenty fields per event that would be read and thrown away.
+FIELDS = "nextPageToken,items(id,summary,location,description,start,end)"
 
 #: The id is already taken - by this very leistungstag, on a retry, or by
 #: the deleted event a purged one left behind.
@@ -172,6 +182,65 @@ class GoogleCalendar(Calendar):
             if status_of(error) not in MISSING:
                 raise
             logging.info("calendar: %s was already gone", uid)
+
+    def existing_events(self) -> dict[str, CalendarEvent]:
+        """! Every event in the calendar, by id
+
+        One request for the lot - `events.list` hands out up to
+        `PAGE_SIZE` at a time - so the startup pass can ask what is there
+        instead of writing every leistungstag to find out.
+
+        Deleted events are left out, which is the default: an id google
+        still remembers deleting is not an entry anybody can see, and the
+        pass has to write that one again.
+        """
+        events: dict[str, CalendarEvent] = {}
+        page = None
+        while True:
+            answer = self.execute(
+                self.events().list(
+                    calendarId=self.calendar_id,
+                    maxResults=PAGE_SIZE,
+                    fields=FIELDS,
+                    pageToken=page,
+                ),
+            )
+            for item in answer.get("items", []):
+                event = self.event_from(item)
+                if event:
+                    events[event.uid] = event
+            page = answer.get("nextPageToken")
+            if not page:
+                return events
+
+    def event_from(self, item: dict) -> CalendarEvent | None:
+        """! One event resource as a `CalendarEvent`, if it is comparable
+
+        `None` for an all day event: it has a `date` where this bot writes
+        a `dateTime`, so it is nothing this bot put there and nothing it
+        can compare against.
+        """
+        start = item.get("start", {})
+        end = item.get("end", {})
+        if "dateTime" not in start or "dateTime" not in end:
+            return None
+
+        return CalendarEvent(
+            uid=item.get("id", ""),
+            summary=item.get("summary", ""),
+            # the api answers in the event's own zone, so dropping the
+            # offset gives back the wall clock time that was written
+            start=self.wall_clock(start["dateTime"]),
+            end=self.wall_clock(end["dateTime"]),
+            location=item.get("location", ""),
+            description=item.get("description", ""),
+            timezone=start.get("timeZone", ""),
+        )
+
+    @staticmethod
+    def wall_clock(stamp: str) -> datetime:
+        """! An RFC3339 stamp as the local time it reads as"""
+        return datetime.fromisoformat(stamp).replace(tzinfo=None)
 
     def events(self):
         """! The api's events collection

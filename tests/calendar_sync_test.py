@@ -60,6 +60,10 @@ class FakeCalendar(Calendar):
         self.calls.append(("remove", uid))
         self.events.pop(uid, None)
 
+    def existing_events(self) -> dict:
+        self.calls.append(("list", ""))
+        return dict(self.events)
+
     @property
     def kinds(self) -> list[str]:
         return [kind for kind, _ in self.calls]
@@ -114,6 +118,18 @@ def add_leistungstag(
     poll_id: int = 555,
 ) -> int:
     return db.addLeistungsTag(when, name, poll_id, poll_id - 1, int(type))
+
+
+def forget(calendar) -> None:
+    """The calendar has never heard of any of it.
+
+    Which is the situation the startup pass is for: leistungstage that
+    were in the database before there was a calendar. The `sync` fixture
+    is subscribed, so anything added through it has already been
+    announced - this undoes that.
+    """
+    calendar.events.clear()
+    calendar.calls.clear()
 
 
 # ──────────────────────── the database announces ────────────────────────
@@ -265,7 +281,7 @@ def test_the_backfill_puts_everything_into_the_calendar(db, calendar, sync):
         add_leistungstag(db, when=date(2026, 8, 4), poll_id=1),
         add_leistungstag(db, when=date(2026, 8, 11), poll_id=2),
     ]
-    calendar.calls.clear()
+    forget(calendar)
 
     assert sync.backfill() == 2
     assert set(calendar.events) == {event_uid(key) for key in keys}
@@ -276,21 +292,22 @@ def test_the_backfill_updates_rather_than_adds(db, calendar, sync):
     be created spends a request on being told so, and a burst of those is
     what google answers with "Rate Limit Exceeded"."""
     add_leistungstag(db)
-    calendar.calls.clear()
+    forget(calendar)
 
     sync.backfill()
 
-    assert calendar.kinds == ["update"]
+    assert calendar.kinds == ["list", "update"]
 
 
 def test_the_backfill_starts_with_the_oldest(db, calendar, sync):
     old = add_leistungstag(db, when=date(2026, 8, 4), poll_id=1)
     new = add_leistungstag(db, when=date(2026, 8, 11), poll_id=2)
-    calendar.calls.clear()
+    forget(calendar)
 
     sync.backfill()
 
     assert calendar.calls == [
+        ("list", ""),
         ("update", event_uid(old)),
         ("update", event_uid(new)),
     ]
@@ -307,10 +324,11 @@ def test_the_backfill_paces_itself(db, calendar, sync, monkeypatch):
     )
     for poll_id in (1, 2, 3):
         add_leistungstag(db, poll_id=poll_id)
+    forget(calendar)
 
     sync.backfill()
 
-    assert slept == [0.5, 0.5], "waits between entries, not before the first"
+    assert slept == [0.5, 0.5], "waits between writes, not before the first"
 
 
 def test_the_backfill_gives_up_after_enough_refusals(db, calendar, sync):
@@ -349,6 +367,7 @@ def test_a_success_in_between_resets_the_patience(db, calendar, sync):
 
 
 def test_the_backfill_of_an_empty_database_does_nothing(db, calendar, sync):
+    """Not even the one request it takes to ask what is there."""
     assert sync.backfill() == 0
     assert calendar.calls == []
 
@@ -365,6 +384,84 @@ def test_repeating_the_backfill_does_not_duplicate_anything(
     sync.backfill()
 
     assert len(calendar.events) == 1
+
+
+def test_the_backfill_asks_what_is_there_before_writing(db, calendar, sync):
+    add_leistungstag(db)
+    calendar.calls.clear()
+
+    sync.backfill()
+
+    assert calendar.calls[0] == ("list", "")
+
+
+def test_entries_that_are_already_right_are_left_alone(db, calendar, sync):
+    """The usual start: nothing to do, and one request to find that out."""
+    for poll_id in (1, 2, 3):
+        add_leistungstag(db, poll_id=poll_id)
+    sync.backfill()
+    calendar.calls.clear()
+
+    assert sync.backfill() == 0
+    assert calendar.kinds == ["list"]
+
+
+def test_an_entry_that_says_something_else_is_written(db, calendar, sync):
+    """A write that was refused last time, or somebody editing the entry in
+    the calendar."""
+    key = add_leistungstag(db)
+    sync.backfill()
+    calendar.events[event_uid(key)].summary = "Was ganz anderes"
+    calendar.calls.clear()
+
+    assert sync.backfill() == 1
+    assert calendar.kinds == ["list", "update"]
+
+
+def test_an_entry_that_is_not_there_is_written(db, calendar, sync):
+    key = add_leistungstag(db)
+    sync.backfill()
+    del calendar.events[event_uid(key)]
+    calendar.calls.clear()
+
+    assert sync.backfill() == 1
+    assert calendar.kinds == ["list", "update"]
+
+
+def test_only_the_entries_that_need_it_are_written(db, calendar, sync):
+    add_leistungstag(db, poll_id=1)
+    stale = add_leistungstag(db, poll_id=2)
+    add_leistungstag(db, poll_id=3)
+    sync.backfill()
+    del calendar.events[event_uid(stale)]
+    calendar.calls.clear()
+
+    sync.backfill()
+
+    assert calendar.calls == [("list", ""), ("update", event_uid(stale))]
+
+
+def test_a_calendar_that_will_not_say_gets_everything(db, calendar, sync):
+    """Not knowing is slower, not wrong."""
+    add_leistungstag(db, poll_id=1)
+    add_leistungstag(db, poll_id=2)
+    silent = MagicMock(spec=Calendar)
+    silent.existing_events.side_effect = RuntimeError("no reading either")
+    sync.calendar = silent
+
+    assert sync.backfill() == 2
+    assert silent.update_event.call_count == 2
+
+
+def test_a_backend_that_cannot_list_gets_everything(db, calendar, sync):
+    """`existing_events` is optional - the base class answers with nothing."""
+    from leistungsbot.leistungs_calendar import Calendar as Base
+
+    add_leistungstag(db)
+    forget(calendar)
+
+    assert Base.existing_events(calendar) == {}
+    assert sync.backfill() == 1
 
 
 def test_one_entry_that_fails_does_not_cost_the_rest(db, calendar, sync):

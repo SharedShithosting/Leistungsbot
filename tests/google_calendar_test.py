@@ -25,6 +25,8 @@ from unittest.mock import MagicMock
 import pytest
 from googleapiclient.errors import HttpError
 
+from leistungsbot.google_calendar import FIELDS
+from leistungsbot.google_calendar import PAGE_SIZE
 from leistungsbot.google_calendar import RETRIES
 from leistungsbot.google_calendar import GoogleCalendar
 from leistungsbot.leistungs_calendar import CalendarEvent
@@ -186,6 +188,124 @@ def test_extra_fields_are_passed_through(calendar, event):
     event.extra = {"transparency": "transparent"}
 
     assert calendar.body(event)["transparency"] == "transparent"
+
+
+# ──────────────────────────── reading it back ───────────────────────────
+
+
+def google_event(uid: str = "leistungstag42", **overrides) -> dict:
+    """An event resource as the api hands it back."""
+    return {
+        "id": uid,
+        "summary": "Leistungstag: Bar A",
+        "location": "Adresse A",
+        "description": "+43 1",
+        "start": {
+            "dateTime": "2026-08-04T19:00:00+02:00",
+            "timeZone": "Europe/Vienna",
+        },
+        "end": {
+            "dateTime": "2026-08-04T22:00:00+02:00",
+            "timeZone": "Europe/Vienna",
+        },
+    } | overrides
+
+
+def test_the_calendar_can_be_read_in_one_request(calendar, service):
+    service.events().list().execute.return_value = {
+        "items": [
+            google_event("leistungstag1"),
+            google_event("leistungstag2"),
+        ],
+    }
+
+    events = calendar.existing_events()
+
+    assert set(events) == {"leistungstag1", "leistungstag2"}
+    service.events().list().execute.assert_called_once()
+
+
+def test_reading_asks_for_a_full_page_and_nothing_it_throws_away(
+    calendar,
+    service,
+):
+    service.events().list().execute.return_value = {}
+
+    calendar.existing_events()
+
+    kwargs = service.events().list.call_args.kwargs
+    assert kwargs["calendarId"] == CALENDAR_ID
+    assert kwargs["maxResults"] == PAGE_SIZE
+    assert kwargs["fields"] == FIELDS
+
+
+def test_an_event_comes_back_the_way_it_went_in(calendar, service, event):
+    """What the comparison in the startup pass rests on: an untouched entry
+    reads back equal to the one the database describes."""
+    service.events().list().execute.return_value = {"items": [google_event()]}
+
+    assert calendar.existing_events()["leistungstag42"] == event
+
+
+def test_the_offset_is_dropped_rather_than_converted(calendar, service):
+    """The api answers in the event's own zone, so the wall clock time is
+    what was written - a conversion would make every entry look changed."""
+    service.events().list().execute.return_value = {"items": [google_event()]}
+
+    read = calendar.existing_events()["leistungstag42"]
+
+    assert read.start == datetime(2026, 8, 4, 19, 0)
+    assert read.start.tzinfo is None
+    assert read.timezone == "Europe/Vienna"
+
+
+def test_every_page_is_read(calendar, service):
+    service.events().list().execute.side_effect = [
+        {"items": [google_event("leistungstag1")], "nextPageToken": "page-2"},
+        {"items": [google_event("leistungstag2")]},
+    ]
+
+    events = calendar.existing_events()
+
+    assert set(events) == {"leistungstag1", "leistungstag2"}
+    assert service.events().list.call_args.kwargs["pageToken"] == "page-2"
+
+
+def test_an_all_day_event_is_ignored(calendar, service):
+    """Somebody else's entry, in a calendar that is not only ours."""
+    service.events().list().execute.return_value = {
+        "items": [
+            {"id": "urlaub", "start": {"date": "2026-08-04"}, "end": {}},
+            google_event(),
+        ],
+    }
+
+    assert set(calendar.existing_events()) == {"leistungstag42"}
+
+
+def test_a_missing_description_reads_as_an_empty_one(calendar, service):
+    """The api leaves the field out rather than sending an empty string."""
+    item = google_event()
+    del item["description"]
+    service.events().list().execute.return_value = {"items": [item]}
+
+    assert calendar.existing_events()["leistungstag42"].description == ""
+
+
+def test_an_empty_calendar_reads_as_nothing(calendar, service):
+    service.events().list().execute.return_value = {}
+
+    assert calendar.existing_events() == {}
+
+
+def test_reading_backs_off_as_well(calendar, service):
+    service.events().list().execute.return_value = {}
+
+    calendar.existing_events()
+
+    assert service.events().list().execute.call_args.kwargs == {
+        "num_retries": RETRIES,
+    }
 
 
 # ────────────────────────── the answers that are not errors ─────────────

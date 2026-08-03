@@ -37,10 +37,11 @@ At every start the bot also walks the whole `leistungstag` table into the
 calendar, oldest first and in a background thread. That is what gets the
 leistungstage that predate the calendar in there, and it is safe to
 repeat - an entry is identified by the leistungstag it belongs to, so it
-is written over rather than duplicated. It is deliberately unhurried:
-google answers a burst of writes to one calendar with "Rate Limit
-Exceeded", so the pass waits between entries and leaves the rest for the
-next start if the calendar refuses five times in a row.
+is written over rather than duplicated. It reads the calendar once and
+then writes only what is missing or says something else, so the usual
+start costs a single request. The writes that are left are paced -
+google answers a burst of them with "Rate Limit Exceeded" - and five
+refusals in a row leave the rest for the next start.
 
 Off unless configured, which is the `calendar` section:
 

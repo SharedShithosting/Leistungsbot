@@ -135,6 +135,16 @@ class Calendar(ABC):
         belonged to is gone either way.
         """
 
+    def existing_events(self) -> dict[str, CalendarEvent]:
+        """! Everything the calendar currently holds, by uid
+
+        So that the startup pass can ask once what is already there
+        instead of writing every leistungstag to find out. A backend that
+        cannot answer this cheaply may leave it - an empty answer means
+        "no idea", and the pass falls back to writing.
+        """
+        return {}
+
 
 class CalendarSync:
     """! Keeps a `Calendar` in step with the `leistungstag` table
@@ -176,43 +186,53 @@ class CalendarSync:
             )
 
     def backfill(self) -> int:
-        """! Puts every leistungstag the database knows into the calendar
+        """! Brings the calendar in line with the whole database
 
-        @returns How many of them made it
+        @returns How many entries had to be written
 
         For the leistungstage that already existed when the calendar was
         configured: they were never announced, so nothing else would ever
         put them there. Oldest first, so a calendar that is being filled
         for the first time fills in the order the group lived it.
 
-        Safe to repeat, which is why it can just run at every start: the
-        uid comes from the leistungstag key, so an entry that is already
-        there is written over rather than duplicated.
+        It asks the calendar what it already holds, once, and then only
+        writes what is missing or says something else. That is the whole
+        point: the usual start has nothing to do and costs a single
+        request, instead of one write per leistungstag against a quota
+        that answers a burst with "Rate Limit Exceeded". A calendar that
+        cannot say what it holds answers with nothing, and then everything
+        is written - which is what this did before.
 
-        Paced, and it gives up early. A history of fifty leistungstage is
-        fifty writes to the same calendar in a row, and google answers a
-        burst like that with "Rate Limit Exceeded" - a `403` the client
-        backs off from, but only so far. What it cannot back off from is
-        the next forty entries queueing up behind it, hence `BACKFILL_PAUSE`
-        between two of them and `BACKFILL_GIVE_UP` failures in a row before
-        the rest is left to the next start.
+        The writes that are left are paced by `BACKFILL_PAUSE`, and
+        `BACKFILL_GIVE_UP` refusals in a row end the pass rather than
+        queueing the rest of the history behind a calendar that is already
+        saying no. What is left over is written at the next start.
 
         One entry that cannot be written does not stop the rest - a single
         purged location would otherwise cost the whole history.
         """
         leistungstage = self.db.getLeistungsTags() or []
+        if not leistungstage:
+            return 0
+
+        existing = self.existing_events()
         done = 0
         failed = 0
         in_a_row = 0
+        written = 0
         # getLeistungsTags hands them back newest first
-        for position, leistungstag in enumerate(reversed(leistungstage)):
-            if position:
+        for leistungstag in reversed(leistungstage):
+            event = self.event_for(leistungstag)
+            if existing.get(event.uid) == event:
+                continue
+            if written:
                 sleep(BACKFILL_PAUSE)
+            written += 1
             try:
-                # update rather than add: after the first start the entry
-                # is already there, and asking for it to be created first
-                # would spend a request on being told so
-                self.calendar.update_event(self.event_for(leistungstag))
+                # update rather than add: an entry that is only out of date
+                # is the common case, and asking for it to be created first
+                # would spend a request on being told it exists
+                self.calendar.update_event(event)
                 done += 1
                 in_a_row = 0
             except Exception:
@@ -230,11 +250,27 @@ class CalendarSync:
                     )
                     break
         logging.info(
-            "calendar: %s leistungstage synced, %s failed",
+            "calendar: %s of %s leistungstage written, %s failed",
             done,
+            len(leistungstage),
             failed,
         )
         return done
+
+    def existing_events(self) -> dict[str, CalendarEvent]:
+        """! What the calendar holds, or nothing when it will not say
+
+        Never raises: not knowing means writing everything, which is
+        slower but still correct.
+        """
+        try:
+            return self.calendar.existing_events()
+        except Exception:
+            logging.exception(
+                "calendar: could not read what is already there, "
+                "writing everything",
+            )
+            return {}
 
     def event_for(self, leistungstag: dict) -> CalendarEvent:
         """! The calendar entry a row of the `leistungstag` table describes"""
