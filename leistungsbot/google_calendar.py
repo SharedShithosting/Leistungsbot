@@ -32,6 +32,15 @@ from leistungsbot.leistungs_calendar import CalendarEvent
 #: not granted to service accounts on a shared calendar.
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
+#: How often a request may be repeated before it is allowed to fail.
+#:
+#: The client turns this into a randomised exponential backoff over the
+#: answers that mean "later" - 429, the 5xx family, and the 403s whose
+#: reason is a rate limit. It only does that when it is asked to: the
+#: default is zero retries, and the startup pass duly gave up on the first
+#: "Rate Limit Exceeded" google answered.
+RETRIES = 5
+
 #: The id is already taken - by this very leistungstag, on a retry, or by
 #: the deleted event a purged one left behind.
 CONFLICT = 409
@@ -103,22 +112,30 @@ class GoogleCalendar(Calendar):
             **event.extra,
         }
 
+    def execute(self, request):
+        """! Runs one api request, backing off rather than giving up
+
+        Every call goes through here, so none of them can forget to.
+        """
+        return request.execute(num_retries=RETRIES)
+
     def insert(self, event: CalendarEvent) -> None:
         """! Creates the event, id and all. Raises on a conflict."""
         body = self.body(event)
         body["id"] = event.uid
-        self.events().insert(
-            calendarId=self.calendar_id,
-            body=body,
-        ).execute()
+        self.execute(
+            self.events().insert(calendarId=self.calendar_id, body=body),
+        )
 
     def update(self, event: CalendarEvent) -> None:
         """! Writes over the event with `event.uid`. Raises when it is gone."""
-        self.events().update(
-            calendarId=self.calendar_id,
-            eventId=event.uid,
-            body=self.body(event),
-        ).execute()
+        self.execute(
+            self.events().update(
+                calendarId=self.calendar_id,
+                eventId=event.uid,
+                body=self.body(event),
+            ),
+        )
 
     def add_event(self, event: CalendarEvent) -> None:
         try:
@@ -145,10 +162,12 @@ class GoogleCalendar(Calendar):
 
     def remove_event(self, uid: str) -> None:
         try:
-            self.events().delete(
-                calendarId=self.calendar_id,
-                eventId=uid,
-            ).execute()
+            self.execute(
+                self.events().delete(
+                    calendarId=self.calendar_id,
+                    eventId=uid,
+                ),
+            )
         except HttpError as error:
             if status_of(error) not in MISSING:
                 raise

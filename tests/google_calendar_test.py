@@ -25,6 +25,7 @@ from unittest.mock import MagicMock
 import pytest
 from googleapiclient.errors import HttpError
 
+from leistungsbot.google_calendar import RETRIES
 from leistungsbot.google_calendar import GoogleCalendar
 from leistungsbot.leistungs_calendar import CalendarEvent
 
@@ -93,6 +94,41 @@ def test_the_request_is_executed(calendar, service, event):
     calendar.add_event(event)
 
     service.events().insert().execute.assert_called()
+
+
+# ─────────────────────────────── backing off ────────────────────────────
+
+
+def test_a_request_is_allowed_to_be_retried(calendar, service, event):
+    """The client turns `num_retries` into a randomised exponential backoff
+    over 429, the 5xx family and the rate limited 403s. Its default is
+    zero, which is why the startup pass gave up on the first one."""
+    calendar.add_event(event)
+
+    assert service.events().insert().execute.call_args.kwargs == {
+        "num_retries": RETRIES,
+    }
+
+
+def test_an_update_backs_off_as_well(calendar, service, event):
+    calendar.update_event(event)
+
+    assert service.events().update().execute.call_args.kwargs == {
+        "num_retries": RETRIES,
+    }
+
+
+def test_a_delete_backs_off_as_well(calendar, service):
+    calendar.remove_event("leistungstag42")
+
+    assert service.events().delete().execute.call_args.kwargs == {
+        "num_retries": RETRIES,
+    }
+
+
+def test_the_retries_are_worth_having():
+    """Zero would mean the setting is there and does nothing."""
+    assert RETRIES > 0
 
 
 def test_updating_writes_over_the_event(calendar, service, event):

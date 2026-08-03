@@ -89,6 +89,15 @@ def calendar() -> FakeCalendar:
     return FakeCalendar()
 
 
+@pytest.fixture(autouse=True)
+def _no_pacing(monkeypatch):
+    """The startup pass waits between two entries; not in here it does not.
+
+    `test_the_backfill_paces_itself` is what says the pause is real.
+    """
+    monkeypatch.setattr(leistungs_calendar, "BACKFILL_PAUSE", 0)
+
+
 @pytest.fixture
 def sync(db, calendar) -> CalendarSync:
     """The sync, wired to the database the way `Helper` wires it."""
@@ -259,8 +268,19 @@ def test_the_backfill_puts_everything_into_the_calendar(db, calendar, sync):
     calendar.calls.clear()
 
     assert sync.backfill() == 2
-    assert calendar.kinds == ["add", "add"]
     assert set(calendar.events) == {event_uid(key) for key in keys}
+
+
+def test_the_backfill_updates_rather_than_adds(db, calendar, sync):
+    """After the first start every entry is already there. Asking for it to
+    be created spends a request on being told so, and a burst of those is
+    what google answers with "Rate Limit Exceeded"."""
+    add_leistungstag(db)
+    calendar.calls.clear()
+
+    sync.backfill()
+
+    assert calendar.kinds == ["update"]
 
 
 def test_the_backfill_starts_with_the_oldest(db, calendar, sync):
@@ -271,9 +291,61 @@ def test_the_backfill_starts_with_the_oldest(db, calendar, sync):
     sync.backfill()
 
     assert calendar.calls == [
-        ("add", event_uid(old)),
-        ("add", event_uid(new)),
+        ("update", event_uid(old)),
+        ("update", event_uid(new)),
     ]
+
+
+def test_the_backfill_paces_itself(db, calendar, sync, monkeypatch):
+    """Fifty writes to one calendar in a row is what google refuses."""
+    monkeypatch.setattr(leistungs_calendar, "BACKFILL_PAUSE", 0.5)
+    slept = []
+    monkeypatch.setattr(
+        leistungs_calendar,
+        "sleep",
+        lambda seconds: slept.append(seconds),
+    )
+    for poll_id in (1, 2, 3):
+        add_leistungstag(db, poll_id=poll_id)
+
+    sync.backfill()
+
+    assert slept == [0.5, 0.5], "waits between entries, not before the first"
+
+
+def test_the_backfill_gives_up_after_enough_refusals(db, calendar, sync):
+    """A calendar that says no five times running is rate limited, and
+    asking another forty times is what got it there."""
+    for poll_id in range(1, 9):
+        add_leistungstag(db, poll_id=poll_id)
+    refusing = MagicMock(spec=Calendar)
+    refusing.update_event.side_effect = RuntimeError("Rate Limit Exceeded")
+    sync.calendar = refusing
+
+    assert sync.backfill() == 0
+    assert refusing.update_event.call_count == (
+        leistungs_calendar.BACKFILL_GIVE_UP
+    )
+
+
+def test_a_success_in_between_resets_the_patience(db, calendar, sync):
+    """Only failures *in a row* mean the calendar is having none of it."""
+    for poll_id in range(1, 8):
+        add_leistungstag(db, poll_id=poll_id)
+    flaky = MagicMock(spec=Calendar)
+    flaky.update_event.side_effect = [
+        RuntimeError("no"),
+        RuntimeError("no"),
+        RuntimeError("no"),
+        RuntimeError("no"),
+        None,
+        RuntimeError("no"),
+        None,
+    ]
+    sync.calendar = flaky
+
+    assert sync.backfill() == 2
+    assert flaky.update_event.call_count == 7
 
 
 def test_the_backfill_of_an_empty_database_does_nothing(db, calendar, sync):
@@ -300,11 +372,11 @@ def test_one_entry_that_fails_does_not_cost_the_rest(db, calendar, sync):
     add_leistungstag(db, poll_id=2)
     add_leistungstag(db, poll_id=3)
     failing = MagicMock(spec=Calendar)
-    failing.add_event.side_effect = [RuntimeError("rate limit"), None, None]
+    failing.update_event.side_effect = [RuntimeError("gone"), None, None]
     sync.calendar = failing
 
     assert sync.backfill() == 2
-    assert failing.add_event.call_count == 3
+    assert failing.update_event.call_count == 3
 
 
 # ────────────────────────── what an entry says ──────────────────────────
