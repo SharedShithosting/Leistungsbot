@@ -32,6 +32,9 @@ from datetime import datetime
 from datetime import time
 from datetime import timedelta
 
+# `time` is datetime's, the one above - so the sleep is imported by name
+from time import sleep
+
 from leistungsbot import leistungs_config as lc
 from leistungsbot.leistungs_db import Change
 
@@ -53,6 +56,18 @@ TITLES = {
 
 DEFAULT_TITLE = "Leistungstag"
 DEFAULT_TIMEZONE = "Europe/Vienna"
+
+#: Seconds between two entries of the startup pass. Google does not
+#: publish the per calendar write limit as a number, it just starts
+#: answering `403 Rate Limit Exceeded` - so this is slow enough to stay
+#: under it and fast enough that a long history is still done in a minute
+#: or two, in a thread nobody is waiting on.
+BACKFILL_PAUSE = 0.5
+
+#: Failures in a row before the startup pass leaves the rest for the next
+#: start. A calendar that says no five times running is rate limited or
+#: gone, and continuing to ask is what made it say no.
+BACKFILL_GIVE_UP = 5
 
 
 def default_timezone() -> str:
@@ -174,24 +189,46 @@ class CalendarSync:
         uid comes from the leistungstag key, so an entry that is already
         there is written over rather than duplicated.
 
+        Paced, and it gives up early. A history of fifty leistungstage is
+        fifty writes to the same calendar in a row, and google answers a
+        burst like that with "Rate Limit Exceeded" - a `403` the client
+        backs off from, but only so far. What it cannot back off from is
+        the next forty entries queueing up behind it, hence `BACKFILL_PAUSE`
+        between two of them and `BACKFILL_GIVE_UP` failures in a row before
+        the rest is left to the next start.
+
         One entry that cannot be written does not stop the rest - a single
-        purged location or a rate limit would otherwise cost the whole
-        history.
+        purged location would otherwise cost the whole history.
         """
         leistungstage = self.db.getLeistungsTags() or []
         done = 0
         failed = 0
+        in_a_row = 0
         # getLeistungsTags hands them back newest first
-        for leistungstag in reversed(leistungstage):
+        for position, leistungstag in enumerate(reversed(leistungstage)):
+            if position:
+                sleep(BACKFILL_PAUSE)
             try:
-                self.calendar.add_event(self.event_for(leistungstag))
+                # update rather than add: after the first start the entry
+                # is already there, and asking for it to be created first
+                # would spend a request on being told so
+                self.calendar.update_event(self.event_for(leistungstag))
                 done += 1
+                in_a_row = 0
             except Exception:
                 failed += 1
+                in_a_row += 1
                 logging.exception(
                     "calendar: could not sync leistungstag %s",
                     leistungstag.get("key"),
                 )
+                if in_a_row >= BACKFILL_GIVE_UP:
+                    logging.error(
+                        "calendar: %s in a row failed, leaving the rest to "
+                        "the next start",
+                        in_a_row,
+                    )
+                    break
         logging.info(
             "calendar: %s leistungstage synced, %s failed",
             done,
