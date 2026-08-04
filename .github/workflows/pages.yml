@@ -34,14 +34,21 @@ concurrency:
   group: "pages-${{ github.ref }}"
   cancel-in-progress: false
 jobs:
-  build:
+  # Not `build`: `docker-image.yml` already has a job by that name and the
+  # two sit next to each other in the checks list.
+  site:
     runs-on: ubuntu-latest
-    env:
-      # Outside the checkout on purpose. Jekyll builds from `./`, so
-      # anything written into the working directory is published with the
-      # site - see `_config.yml` for the rest of that story.
-      REPORTS: ${{ runner.temp }}/reports
     steps:
+      # `$RUNNER_TEMP` is outside the checkout on purpose. Jekyll builds
+      # from `./`, so anything written into the working directory is
+      # published with the site - see `_config.yml` for the rest of that
+      # story.
+      #
+      # It is set here rather than in a job level `env:`, which cannot see
+      # the `runner` context - the workflow does not parse at all if it
+      # tries.
+      - name: Where the reports go
+        run: echo "REPORTS=$RUNNER_TEMP/reports" >> "$GITHUB_ENV"
       - name: Checkout
         uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -103,7 +110,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    needs: build
+    needs: site
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
