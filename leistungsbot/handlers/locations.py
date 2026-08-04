@@ -63,6 +63,7 @@ class LocationHandlers:
     def search_location(self, message):
         try:
             self.process_search_location(
+                message,
                 message.chat.id,
                 message.text.strip(),
             )
@@ -133,9 +134,21 @@ class LocationHandlers:
         except Exception as error:
             self.helper.report_error(message, error)
 
-    def process_search_location(self, chat_id, query):
+    def process_search_location(self, update, chat_id, query):
+        """! Runs a google search and offers what came back
+
+        @param update The message or button press that asked for the search,
+                      so the pickled results can be filed under whoever will
+                      have to be cleaned up after (#97)
+        @param chat_id Where to answer
+        @param query What to look for
+        """
         finds, rand_id = self.helper.search_location(query)
+        self.remember_scratch(update, rand_id)
         if finds < 1:
+            # nothing to pick from, so nothing will ever consume the pickle
+            self.helper.discard_rand_file(rand_id)
+            self.forget_scratch(update, rand_id)
             self.bot.send_message(
                 chat_id,
                 f'Wenn i nach "{query}" suach find i nix...vielleicht verschriebn?',

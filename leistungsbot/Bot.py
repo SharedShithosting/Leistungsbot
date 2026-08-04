@@ -136,6 +136,58 @@ class LeistungsBot(
         """
         return self.user_context.setdefault(update.from_user.id, UserContext())
 
+    def remember_scratch(self, update, rand_id):
+        """! Notes that `update`'s sender has a scratch file open
+
+        The file itself is written by `Helper.store_to_rand_file`, which
+        does not know who it is for. This is the other half: it puts the id
+        where `process_cancel` will look for it, so abandoning the workflow
+        cleans up rather than leaking a pickle. See #97.
+
+        @param rand_id The id, or `None` - callers pass a return value
+                       straight through
+        @returns `rand_id`, unchanged
+        """
+        if rand_id is not None:
+            self.context_of(update).scratch_ids.add(rand_id)
+        return rand_id
+
+    def forget_scratch(self, update, rand_id) -> None:
+        """! Stops tracking a scratch file that has served its purpose
+
+        The finishing paths go through `Helper.load_from_rand_file`, which
+        deletes the file itself - this only keeps the set from growing.
+        """
+        self.context_of(update).scratch_ids.discard(rand_id)
+
+    def discard_scratch(self, user_id: int) -> None:
+        """! Deletes every scratch file `user_id` still has open
+
+        Called when a workflow ends without reaching the button that would
+        have consumed the file.
+        """
+        context = self.user_context.get(user_id)
+        if not context:
+            return
+        for rand_id in context.scratch_ids:
+            self.helper.discard_rand_file(rand_id)
+        context.scratch_ids.clear()
+
+    def sweep_scratch_files(self) -> int:
+        """! Throws away scratch files left behind by earlier runs
+
+        `discard_scratch` covers the user who cancels. Nothing covers the
+        one who just stops answering, and the in-memory tracking does not
+        survive a restart either - so the temp directory gets a pass at
+        startup. See `Helper.sweep_rand_files`.
+
+        @returns How many files were deleted
+        """
+        deleted = self.helper.sweep_rand_files()
+        if deleted:
+            logging.info("swept %d stale scratch files", deleted)
+        return deleted
+
     def register_handlers(self) -> None:
         """! Points telebot at the handler methods, in order
 
@@ -264,5 +316,6 @@ def main():
     print("Starting LeistungsBot")
     lb = LeistungsBot()
     lb.publish_commands()
+    lb.sweep_scratch_files()
     lb.sync_calendar()
     lb.infinite_poll()

@@ -155,6 +155,11 @@ class GeneralHandlers:
         own account and clearing that state clears nothing - the button
         answered "Halt Stop." while leaving the presser exactly where they
         were. See #78.
+
+        Also throws away whatever the workflow had pickled. A scratch file
+        was only ever deleted by the button that consumed it, so cancelling
+        a search or rejecting a preview used to leave one behind for good
+        (#97).
         """
         self.bot.send_message(
             message.chat.id,
@@ -164,6 +169,7 @@ class GeneralHandlers:
         if user_id is None:
             user_id = message.from_user.id
         self.bot.delete_state(user_id, message.chat.id)
+        self.discard_scratch(user_id)
 
     def process_send_nudes(self, chat_id):
         self.helper.send_nude(chat_id)

@@ -12,16 +12,19 @@ written here is visible to the test and to nobody's real /tmp.
 Two different things live in there:
 
 * the database snapshot `/backup` sends, which is cleaned up
-* the pickled scratch files behind the inline buttons, which are cleaned up
-  only when the user walks a workflow all the way to its final button
+* the pickled scratch files behind the inline buttons, which used to be
+  cleaned up only when the user walked a workflow all the way to its final
+  button - #97
 """
 
 from __future__ import annotations
 
+import os
+from datetime import datetime
+from datetime import timedelta
 from pathlib import Path
 
-import pytest
-
+from leistungsbot.BotHelper import SCRATCH_MAX_AGE
 from tests import support
 
 
@@ -58,7 +61,7 @@ def test_the_snapshot_is_removed_even_when_sending_fails(app):
     assert temp_files(app) == [], "a failed send left the snapshot behind"
 
 
-# --- the pickled scratch files, which do not ----------------------------
+# --- the pickled scratch files ------------------------------------------
 
 
 def test_a_finished_search_cleans_up(app):
@@ -76,13 +79,6 @@ def test_a_finished_search_cleans_up(app):
     assert scratch_files(app) == []
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "#97: store_to_rand_file is only undone by load_from_rand_file, so a "
-        "search the user never approves stays in the temp directory for ever"
-    ),
-)
 def test_an_abandoned_search_cleans_up(app):
     support.send_command(app, "/add_location")
     support.send_command(app, "Some Unknown Bar")
@@ -94,13 +90,6 @@ def test_an_abandoned_search_cleans_up(app):
     assert scratch_files(app) == []
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "#97: the dry run pickle is only undone by publish_leistungstag, so "
-        "saying no to the preview leaves it behind"
-    ),
-)
 def test_a_rejected_dry_run_cleans_up(app):
     support.send_command(app, "/leistungspoll")
     support.send_command(app, "Bar A")
@@ -114,3 +103,71 @@ def test_a_rejected_dry_run_cleans_up(app):
     support.press(app, {"🍻cancel": None})
 
     assert scratch_files(app) == []
+
+
+def test_a_search_that_finds_nothing_cleans_up(app, google):
+    """No results means no buttons, so nothing would ever consume it."""
+    google.findPlace.return_value = []
+
+    support.send_command(app, "/add_location")
+    support.send_command(app, "Some Unknown Bar")
+
+    assert scratch_files(app) == []
+
+
+def test_cancelling_only_touches_the_senders_files(app):
+    """Two people searching at once, one gives up."""
+    other = 4004
+    support.send_command(app, "/add_location")
+    support.send_command(app, "Some Unknown Bar")
+    support.send_command(app, "/add_location", user_id=other)
+    support.send_command(app, "Another Bar", user_id=other)
+
+    assert len(scratch_files(app)) == 2
+
+    support.send_command(app, "/cancel")
+
+    assert len(scratch_files(app)) == 1
+
+
+# --- what earlier runs left behind --------------------------------------
+#
+# The cancel paths above need a message to arrive. Nothing arrives from the
+# user who simply stops answering, and the ids are not remembered across a
+# restart either, so the temp directory gets a pass at startup.
+
+
+def age(path: Path, delta: timedelta) -> None:
+    when = (datetime.now() - delta).timestamp()
+    os.utime(path, (when, when))
+
+
+def test_the_sweep_takes_a_stale_scratch_file(app):
+    rand_id = app.helper.store_to_rand_file(["abandoned"])
+    age(Path(app.helper.get_full_temp_file(rand_id)), SCRATCH_MAX_AGE * 2)
+
+    assert app.sweep_scratch_files() == 1
+    assert scratch_files(app) == []
+
+
+def test_the_sweep_leaves_a_fresh_one_alone(app):
+    """An inline button stays pressable, so a recent file is still in use."""
+    app.helper.store_to_rand_file(["in flight"])
+
+    assert app.sweep_scratch_files() == 0
+    assert len(scratch_files(app)) == 1
+
+
+def test_the_sweep_leaves_other_peoples_files_alone(app):
+    """The temp directory belongs to the whole system, not to the bot."""
+    stranger = Path(app.helper.temp_dir) / "somebody-elses.txt"
+    stranger.write_text("not ours")
+    age(stranger, SCRATCH_MAX_AGE * 2)
+
+    app.sweep_scratch_files()
+
+    assert stranger.exists()
+
+
+def test_the_sweep_is_fine_with_an_empty_directory(app):
+    assert app.sweep_scratch_files() == 0

@@ -124,6 +124,8 @@ class CallbackHandlers:
                         )
                 else:
                     res = self.helper.add_location(val[0], val[1])
+                    # add_location consumed the scratch file
+                    self.forget_scratch(call, val[0])
                     if res == LeistungsReturnCodes.DB_DUPLICATE:
                         self.bot.send_message(
                             call.message.chat.id,
@@ -135,12 +137,14 @@ class CallbackHandlers:
                 self.process_cancel(call.message, call.from_user.id)
             elif cmd == "publish":
                 self.helper.publish_leistungstag(val)
+                # publish_leistungstag consumed the scratch file
+                self.forget_scratch(call, val)
                 self.bot.send_message(
                     call.message.chat.id,
                     "Hauma so veröffentlicht",
                 )
             elif cmd == "q":
-                self.process_search_location(call.message.chat.id, val)
+                self.process_search_location(call, call.message.chat.id, val)
             elif cmd == "history_type":
                 self.bot.send_message(
                     call.message.chat.id,
