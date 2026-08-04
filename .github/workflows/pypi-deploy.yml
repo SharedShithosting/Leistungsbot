@@ -18,9 +18,17 @@ jobs:
       # off a tag the version is `1.2.3`, anywhere else it carries a
       # `+<sha>` local part that PyPI refuses. Fail here rather than in
       # the upload, where the error only says "local versions".
+      #
+      # `--tags` is not optional. Without it `git describe` looks at
+      # annotated tags only, and every tag in this repository is
+      # lightweight - `v1.4.3` was refused with "no tag exactly matches"
+      # while standing on exactly that tag. dunamai, which
+      # poetry-dynamic-versioning derives the version with, reads
+      # lightweight tags too, so without `--tags` this guard was stricter
+      # than the thing it guards.
       - name: Refuse to publish an untagged commit
         run: |
-          if ! git describe --exact-match --match 'v*' HEAD; then
+          if ! git describe --tags --exact-match --match 'v*' HEAD; then
             echo "HEAD is not a v* tag - nothing to publish." >&2
             exit 1
           fi
