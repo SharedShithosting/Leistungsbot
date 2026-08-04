@@ -2,6 +2,8 @@
 
 [![unittests](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/unittests.yml/badge.svg)](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/unittests.yml)
 [![integrationtests](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/integrationtests.yml/badge.svg)](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/integrationtests.yml)
+[![tests](https://sharedshithosting.github.io/Leistungsbot/reports/badges/tests-badge.svg)](https://sharedshithosting.github.io/Leistungsbot/reports.html)
+[![coverage](https://sharedshithosting.github.io/Leistungsbot/reports/badges/coverage-badge.svg)](https://sharedshithosting.github.io/Leistungsbot/reports/coverage/)
 [![Docker Image CI](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/docker-image.yml/badge.svg)](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/docker-image.yml)
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/SharedShithosting/Leistungsbot/main.svg)](https://results.pre-commit.ci/latest/github/SharedShithosting/Leistungsbot/main)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
@@ -106,6 +108,13 @@ is the suite `unittests.yml` runs on every pull request, on 3.11 and 3.14.
 waits for an environment approval first. Both hold every file to 75%
 coverage rather than the project as a whole: `tools/check_coverage.py` is
 what fails a module that has no tests at all.
+
+The [coverage report] is published on every push to main, next to the junit
+xml and the ruff output - see
+<https://sharedshithosting.github.io/Leistungsbot/reports.html>. Badges lag
+by up to ten minutes: github serves README images through a cache.
+
+[coverage report]: https://sharedshithosting.github.io/Leistungsbot/reports/coverage/
 
 
 ### Development database

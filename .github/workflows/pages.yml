@@ -1,0 +1,110 @@
+# The github pages site: the README as the landing page, and the reports
+# every test run produces underneath it. See #39.
+#
+# One workflow rather than two. A repository has a single pages deployment,
+# so a workflow publishing only the reports would replace the landing page
+# on every push and be replaced right back by the next one. That is why the
+# report steps live here instead of in `unittests.yml`, and why this file
+# replaced `jekyll-gh-pages.yml` rather than joining it.
+#
+# The suite runs here as well. It is the mocked one, so it needs no secrets
+# and no approval - `integrationtests.yml` needs both and could not be the
+# source of a badge that has to move on every push to main.
+name: pages
+on:
+  push:
+    branches: ["main"]
+  # Builds the site without deploying it. Without this the workflow only
+  # ever runs on main, so a `_config.yml` that does not build would take
+  # the site down and be found afterwards.
+  pull_request:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+#
+# Keyed by ref so a pull request checking its own build does not queue
+# behind a deployment of main, or hold one up.
+concurrency:
+  group: "pages-${{ github.ref }}"
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # Outside the checkout on purpose. Jekyll builds from `./`, so
+      # anything written into the working directory is published with the
+      # site - see `_config.yml` for the rest of that story.
+      REPORTS: ${{ runner.temp }}/reports
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: snok/install-poetry@v1
+        with:
+          version: 2.0.0
+          virtualenvs-create: true
+          # Not in-project, unlike the other workflows: a `.venv` in the
+          # checkout would be served as part of the site, every dependency
+          # with it.
+          virtualenvs-in-project: false
+      - run: poetry install --no-interaction --with=dev
+      - run: mkdir -p "$REPORTS"/{junit,coverage,ruff,badges}
+      # `|| true`: a red suite still deserves a published report, and a
+      # badge saying so is the useful state. `unittests.yml` is the one
+      # that fails the build.
+      - name: Tests
+        run: |
+          poetry run coverage run -m pytest tests/ \
+            --junitxml="$REPORTS/junit/junit.xml" || true
+      - name: Coverage report
+        run: |
+          poetry run coverage html -d "$REPORTS/coverage"
+          poetry run coverage xml -o "$REPORTS/coverage/coverage.xml"
+          poetry run coverage json -o "$REPORTS/coverage/coverage.json"
+      # No badge for this one: genbadge reads flake8's statistics format and
+      # ruff does not produce it.
+      - name: Lint report
+        run: poetry run ruff check leistungsbot --exit-zero | tee "$REPORTS/ruff/ruff.txt"
+      - name: Badges
+        run: |
+          poetry run genbadge tests -i "$REPORTS/junit/junit.xml" \
+            -o "$REPORTS/badges/tests-badge.svg"
+          poetry run genbadge coverage -i "$REPORTS/coverage/coverage.xml" \
+            -o "$REPORTS/badges/coverage-badge.svg"
+      # Wants `pages: write`, which a pull request from a fork does not get.
+      # Every branch in this repository does; a fork's build stops here and
+      # main is unaffected.
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Build with Jekyll
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./
+          destination: ./_site
+      # After the jekyll build, so coverage's html is served exactly as it
+      # was written rather than run through a markdown converter.
+      - name: Add the reports to the site
+        run: cp -r "$REPORTS" ./_site/reports
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+  # Deployment job. A pull request builds the site above and stops there -
+  # only main is published.
+  deploy:
+    if: github.event_name != 'pull_request'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
