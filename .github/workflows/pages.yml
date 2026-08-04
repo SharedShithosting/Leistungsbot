@@ -98,8 +98,15 @@ jobs:
           destination: ./_site
       # After the jekyll build, so coverage's html is served exactly as it
       # was written rather than run through a markdown converter.
+      #
+      # `jekyll-build-pages` is a container action running as root, so
+      # `_site` comes back owned by root and the runner user cannot add a
+      # directory to it. Taking it over first keeps the artifact free of
+      # root owned files rather than copying in as root as well.
       - name: Add the reports to the site
-        run: cp -r "$REPORTS" ./_site/reports
+        run: |
+          sudo chown -R "$(id -u):$(id -g)" ./_site
+          cp -r "$REPORTS" ./_site/reports
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
   # Deployment job. A pull request builds the site above and stops there -
