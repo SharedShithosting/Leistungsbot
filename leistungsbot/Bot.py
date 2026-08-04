@@ -155,6 +155,13 @@ class LeistungsBot(
             self.callback_query,
             func=self.helper.filter(),
         )
+        # Last, and without a filter: telebot stops at the first handler
+        # that matches, so this only ever sees callback data neither of the
+        # two above recognised. See #82.
+        bot.register_callback_query_handler(
+            self.unhandled_callback,
+            func=None,
+        )
 
         for handler, kwargs in self.MESSAGE_HANDLERS:
             # `@bot.message_handler` defaults content_types to text,

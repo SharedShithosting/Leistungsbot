@@ -57,6 +57,20 @@ class Helper:
             self.db.subscribe(self.calendar.on_change)
 
     def filter(self):
+        """! The predicate that picks out this bot's own inline buttons
+
+        Every keyboard the bot builds carries `{"🍻cmd": value}` as its
+        callback data, and `CallbackHandlers.callback_query` is written for
+        exactly that shape.
+
+        The `return` at the end used to be missing, so this evaluated to
+        `None`. Telebot strips a `None` filter, which left the handler
+        registered with no filter at all - it was the catch-all for every
+        callback the calendar handler above it did not take, and its "Hi
+        Devs!! Handle this callback" branch could never be reached by
+        anything but our own json. See #82.
+        """
+
         def inn(callback):
             try:
                 data = json.loads(callback.data)
@@ -64,6 +78,8 @@ class Helper:
                 return cmd.startswith("🍻")
             except BaseException:
                 return False
+
+        return inn
 
     def escape_markdown(self, text: str, markdown_version: int = 2):
         return telebot.formatting.escape_markdown(text)

@@ -26,20 +26,20 @@ def open_bug(number: int, what: str):
 
 
 # --- #82 Helper.filter() returns None ----------------------------------
+#
+# Fixed. The predicate is returned now, so the handler is registered with a
+# filter rather than as the catch-all for every callback query.
 
 
-@open_bug(82, "filter() builds its predicate and forgets to return it")
 def test_the_callback_filter_is_a_predicate(app):
     assert callable(app.helper.filter())
 
 
-@open_bug(82, "filter() returns None, so telebot applies no filter at all")
 def test_the_callback_filter_accepts_our_own_callbacks(app):
     predicate = app.helper.filter()
     assert predicate(support.make_callback({"🍻open": 1}))
 
 
-@open_bug(82, "filter() returns None, so foreign callbacks are not excluded")
 def test_the_callback_filter_rejects_foreign_callbacks(app):
     predicate = app.helper.filter()
     assert not predicate(support.make_callback({"something-else": 1}))

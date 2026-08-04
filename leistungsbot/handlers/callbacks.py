@@ -63,6 +63,27 @@ class CallbackHandlers:
         )
         return False
 
+    def unhandled_callback(self, call):
+        """! Reports a button press nothing else claimed
+
+        Registered last and without a filter, so it only sees what neither
+        the calendar nor `Helper.filter` took - callback data that is not
+        the bot's own `{"🍻cmd": value}` json.
+
+        Until #82 `callback_query` was that catch-all by accident: its
+        filter evaluated to `None` and telebot dropped it. Giving the filter
+        back its `return` would have made a foreign callback disappear
+        without a word, so the reporting moved here instead of going away.
+        """
+        try:
+            self.bot.answer_callback_query(call.id, "Copy that")
+            self.bot.send_message(
+                lc.config["chat_id"],
+                f"Hi Devs!!\nHandle this callback\n{call.data}",
+            )
+        except Exception as error:
+            self.helper.report_error(call.message, error)
+
     def callback_query(self, call):
         try:
             data = json.loads(call.data)
