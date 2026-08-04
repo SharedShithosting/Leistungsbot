@@ -233,6 +233,16 @@ class CallbackHandlers:
                         call.message.reply_to_message,
                         val,
                     )
+                else:
+                    # The keyboard says which poll, the state said what to
+                    # do with it - and since #17 a later command ends the
+                    # conversation, so the button can outlive its meaning.
+                    # Silence here looked like a broken button.
+                    self.bot.reply_to(
+                        call.message,
+                        "I waß nimma, wos i mit dem Poll soi. "
+                        "Fang nu amoi vo vorn au.",
+                    )
             elif cmd == "closed":
                 self.bot.reply_to(
                     call.message,

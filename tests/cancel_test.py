@@ -214,13 +214,6 @@ def test_the_misspelling_works_too(app, state_name):
     support.assert_said(app, "Halt Stop.")
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "#17: any command that is not registered is eaten as text input by "
-        "whatever state handler is listening, instead of falling through"
-    ),
-)
 def test_an_unregistered_command_is_not_swallowed(app):
     support.send_command(app, "/leistungspoll")
 

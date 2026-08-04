@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import argparse
+import functools
 import logging
 import threading
 from datetime import datetime
@@ -95,6 +96,16 @@ class LeistungsBot(
         # regardless of state; it wins over the state handlers below because
         # they are registered after it.
         ("cancel", {"commands": Commands.CANCEL.names}),
+        # /switcheroo and /version used to sit at the very bottom of this
+        # list, below the state handlers, which meant a state handler
+        # swallowed them while a conversation was open - /switcheroo typed
+        # during /leistungspoll arrived as a location name. See #17.
+        ("switcheroo", {"commands": Commands.SWITCHEROO.names}),
+        ("version", {"commands": Commands.VERSION.names}),
+        # Below every command and above every state handler, so a mistyped
+        # command is answered rather than read as the answer the open
+        # conversation was waiting for. See #17.
+        ("unknown_command", {"func": "is_unknown_command"}),
         ("get_poll_location", {"state": LeistungsState.normalLocation}),
         (
             "get_konkurrenz_location",
@@ -112,8 +123,6 @@ class LeistungsBot(
             "switcheroo_alternate_location",
             {"state": LeistungsState.switcherooAlternateLocation},
         ),
-        ("switcheroo", {"commands": Commands.SWITCHEROO.names}),
-        ("version", {"commands": Commands.VERSION.names}),
     )
 
     def __init__(self) -> None:
@@ -196,6 +205,10 @@ class LeistungsBot(
         Telebot dispatches to the first handler that matches, so a state
         handler listed above a command handler swallows that command.
         Reordering this list changes behaviour.
+
+        A `"func"` in the table names a predicate method rather than
+        holding one, so `MESSAGE_HANDLERS` stays a table of strings that
+        can be read without resolving anything.
         """
         bot = self.bot
 
@@ -216,15 +229,47 @@ class LeistungsBot(
         )
 
         for handler, kwargs in self.MESSAGE_HANDLERS:
+            function = getattr(self, handler)
+            kwargs = dict(kwargs)
+            if "func" in kwargs:
+                kwargs["func"] = getattr(self, kwargs["func"])
+            if "commands" in kwargs:
+                function = self.ends_the_conversation(function)
             # `@bot.message_handler` defaults content_types to text,
             # `register_message_handler` hands the None straight through and
             # a handler without content types matches every kind of message.
             # Passing it explicitly keeps these handlers text only.
             bot.register_message_handler(
-                getattr(self, handler),
+                function,
                 content_types=["text"],
                 **kwargs,
             )
+
+    def ends_the_conversation(self, handler):
+        """! Wraps a command handler so it starts from a clean state
+
+        A command is the start of something, and telebot keeps a state
+        until somebody deletes it. So /leistungspoll followed by
+        /show_locations left `normalLocation` set, and the next line of
+        chat was read as the location the *first* command had asked for -
+        the second command looked like it had not happened. See #17.
+
+        Only the command handlers get this. The state handlers below them
+        are the conversation, and the inline buttons are not messages, so
+        neither is wrapped.
+
+        Deliberately not `discard_scratch`: ending the conversation is not
+        the same as saying no to it, and the preview behind a 🍻publish
+        button outlives the state that produced it. /cancel is what throws
+        those away.
+        """
+
+        @functools.wraps(handler)
+        def start_fresh(message):
+            self.bot.delete_state(message.from_user.id, message.chat.id)
+            return handler(message)
+
+        return start_fresh
 
     def sync_calendar(self, background: bool = True):
         """! Brings the calendar up to date with the whole database
