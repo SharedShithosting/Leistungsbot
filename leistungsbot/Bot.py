@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import argparse
+import functools
 import logging
 import threading
 from datetime import datetime
@@ -95,6 +96,16 @@ class LeistungsBot(
         # regardless of state; it wins over the state handlers below because
         # they are registered after it.
         ("cancel", {"commands": Commands.CANCEL.names}),
+        # /switcheroo and /version used to sit at the very bottom of this
+        # list, below the state handlers, which meant a state handler
+        # swallowed them while a conversation was open - /switcheroo typed
+        # during /leistungspoll arrived as a location name. See #17.
+        ("switcheroo", {"commands": Commands.SWITCHEROO.names}),
+        ("version", {"commands": Commands.VERSION.names}),
+        # Below every command and above every state handler, so a mistyped
+        # command is answered rather than read as the answer the open
+        # conversation was waiting for. See #17.
+        ("unknown_command", {"func": "is_unknown_command"}),
         ("get_poll_location", {"state": LeistungsState.normalLocation}),
         (
             "get_konkurrenz_location",
@@ -112,8 +123,6 @@ class LeistungsBot(
             "switcheroo_alternate_location",
             {"state": LeistungsState.switcherooAlternateLocation},
         ),
-        ("switcheroo", {"commands": Commands.SWITCHEROO.names}),
-        ("version", {"commands": Commands.VERSION.names}),
     )
 
     def __init__(self) -> None:
@@ -136,6 +145,58 @@ class LeistungsBot(
         """
         return self.user_context.setdefault(update.from_user.id, UserContext())
 
+    def remember_scratch(self, update, rand_id):
+        """! Notes that `update`'s sender has a scratch file open
+
+        The file itself is written by `Helper.store_to_rand_file`, which
+        does not know who it is for. This is the other half: it puts the id
+        where `process_cancel` will look for it, so abandoning the workflow
+        cleans up rather than leaking a pickle. See #97.
+
+        @param rand_id The id, or `None` - callers pass a return value
+                       straight through
+        @returns `rand_id`, unchanged
+        """
+        if rand_id is not None:
+            self.context_of(update).scratch_ids.add(rand_id)
+        return rand_id
+
+    def forget_scratch(self, update, rand_id) -> None:
+        """! Stops tracking a scratch file that has served its purpose
+
+        The finishing paths go through `Helper.load_from_rand_file`, which
+        deletes the file itself - this only keeps the set from growing.
+        """
+        self.context_of(update).scratch_ids.discard(rand_id)
+
+    def discard_scratch(self, user_id: int) -> None:
+        """! Deletes every scratch file `user_id` still has open
+
+        Called when a workflow ends without reaching the button that would
+        have consumed the file.
+        """
+        context = self.user_context.get(user_id)
+        if not context:
+            return
+        for rand_id in context.scratch_ids:
+            self.helper.discard_rand_file(rand_id)
+        context.scratch_ids.clear()
+
+    def sweep_scratch_files(self) -> int:
+        """! Throws away scratch files left behind by earlier runs
+
+        `discard_scratch` covers the user who cancels. Nothing covers the
+        one who just stops answering, and the in-memory tracking does not
+        survive a restart either - so the temp directory gets a pass at
+        startup. See `Helper.sweep_rand_files`.
+
+        @returns How many files were deleted
+        """
+        deleted = self.helper.sweep_rand_files()
+        if deleted:
+            logging.info("swept %d stale scratch files", deleted)
+        return deleted
+
     def register_handlers(self) -> None:
         """! Points telebot at the handler methods, in order
 
@@ -144,6 +205,10 @@ class LeistungsBot(
         Telebot dispatches to the first handler that matches, so a state
         handler listed above a command handler swallows that command.
         Reordering this list changes behaviour.
+
+        A `"func"` in the table names a predicate method rather than
+        holding one, so `MESSAGE_HANDLERS` stays a table of strings that
+        can be read without resolving anything.
         """
         bot = self.bot
 
@@ -155,17 +220,56 @@ class LeistungsBot(
             self.callback_query,
             func=self.helper.filter(),
         )
+        # Last, and without a filter: telebot stops at the first handler
+        # that matches, so this only ever sees callback data neither of the
+        # two above recognised. See #82.
+        bot.register_callback_query_handler(
+            self.unhandled_callback,
+            func=None,
+        )
 
         for handler, kwargs in self.MESSAGE_HANDLERS:
+            function = getattr(self, handler)
+            kwargs = dict(kwargs)
+            if "func" in kwargs:
+                kwargs["func"] = getattr(self, kwargs["func"])
+            if "commands" in kwargs:
+                function = self.ends_the_conversation(function)
             # `@bot.message_handler` defaults content_types to text,
             # `register_message_handler` hands the None straight through and
             # a handler without content types matches every kind of message.
             # Passing it explicitly keeps these handlers text only.
             bot.register_message_handler(
-                getattr(self, handler),
+                function,
                 content_types=["text"],
                 **kwargs,
             )
+
+    def ends_the_conversation(self, handler):
+        """! Wraps a command handler so it starts from a clean state
+
+        A command is the start of something, and telebot keeps a state
+        until somebody deletes it. So /leistungspoll followed by
+        /show_locations left `normalLocation` set, and the next line of
+        chat was read as the location the *first* command had asked for -
+        the second command looked like it had not happened. See #17.
+
+        Only the command handlers get this. The state handlers below them
+        are the conversation, and the inline buttons are not messages, so
+        neither is wrapped.
+
+        Deliberately not `discard_scratch`: ending the conversation is not
+        the same as saying no to it, and the preview behind a 🍻publish
+        button outlives the state that produced it. /cancel is what throws
+        those away.
+        """
+
+        @functools.wraps(handler)
+        def start_fresh(message):
+            self.bot.delete_state(message.from_user.id, message.chat.id)
+            return handler(message)
+
+        return start_fresh
 
     def sync_calendar(self, background: bool = True):
         """! Brings the calendar up to date with the whole database
@@ -257,5 +361,6 @@ def main():
     print("Starting LeistungsBot")
     lb = LeistungsBot()
     lb.publish_commands()
+    lb.sweep_scratch_files()
     lb.sync_calendar()
     lb.infinite_poll()

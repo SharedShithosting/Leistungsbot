@@ -34,6 +34,11 @@ from leistungsbot.google_place import Places
 from leistungsbot.leistungs_db import LeistungsDB
 from leistungsbot.leistungs_returns import LeistungsReturnCodes
 
+#: How long an unread scratch file is kept before `sweep_rand_files` takes
+#: it. Days rather than hours: the id sits in an inline button, and nothing
+#: stops somebody from scrolling up and pressing it next week.
+SCRATCH_MAX_AGE = timedelta(days=7)
+
 
 class LeistungsTyp(IntEnum):
     NORMAL = 1
@@ -57,6 +62,20 @@ class Helper:
             self.db.subscribe(self.calendar.on_change)
 
     def filter(self):
+        """! The predicate that picks out this bot's own inline buttons
+
+        Every keyboard the bot builds carries `{"🍻cmd": value}` as its
+        callback data, and `CallbackHandlers.callback_query` is written for
+        exactly that shape.
+
+        The `return` at the end used to be missing, so this evaluated to
+        `None`. Telebot strips a `None` filter, which left the handler
+        registered with no filter at all - it was the catch-all for every
+        callback the calendar handler above it did not take, and its "Hi
+        Devs!! Handle this callback" branch could never be reached by
+        anything but our own json. See #82.
+        """
+
         def inn(callback):
             try:
                 data = json.loads(callback.data)
@@ -64,6 +83,8 @@ class Helper:
                 return cmd.startswith("🍻")
             except BaseException:
                 return False
+
+        return inn
 
     def escape_markdown(self, text: str, markdown_version: int = 2):
         return telebot.formatting.escape_markdown(text)
@@ -79,6 +100,13 @@ class Helper:
             return open(path, "rb")
 
     def store_to_rand_file(self, data):
+        """! Pickles `data` and hands back the id an inline button carries
+
+        Whoever asks for one of these owns it. `load_from_rand_file` is the
+        happy path, `discard_rand_file` is the abandoned one, and the id
+        belongs in the presser's `UserContext` in the meantime so
+        `process_cancel` can find it. See #97.
+        """
         rand_id = random.randint(10000, 100000)
         with self.get_full_temp_file_handle(rand_id, True) as handle:
             pickle.dump(data, handle)
@@ -93,6 +121,48 @@ class Helper:
             data = pickle.load(handle)
         os.remove(self.get_full_temp_file(rand_id))
         return data
+
+    def discard_rand_file(self, rand_id) -> bool:
+        """! Throws away a scratch file without reading it
+
+        For the paths that end a workflow instead of finishing it.
+
+        @returns Whether there was still a file to delete
+        """
+        try:
+            os.remove(self.get_full_temp_file(rand_id))
+            return True
+        except FileNotFoundError:
+            return False
+
+    def sweep_rand_files(self, max_age: timedelta = SCRATCH_MAX_AGE) -> int:
+        """! Deletes scratch files that nobody is going to come back for
+
+        The cancel paths cover the user who says no. This covers the one who
+        simply stops: no message ever arrives, so nothing else notices. The
+        deadline is generous because an inline button stays pressable for as
+        long as its message exists.
+
+        @param max_age How long a scratch file may sit unread
+        @returns How many files were deleted
+        """
+        deadline = datetime.now() - max_age
+        deleted = 0
+        try:
+            entries = list(Path(self.temp_dir).glob("*_leistung"))
+        except OSError:
+            logging.warning("could not read %s", self.temp_dir, exc_info=True)
+            return 0
+        for path in entries:
+            try:
+                if datetime.fromtimestamp(path.stat().st_mtime) > deadline:
+                    continue
+                path.unlink()
+                deleted += 1
+            except OSError:
+                # somebody else's file, or it went away underneath us
+                logging.debug("could not sweep %s", path, exc_info=True)
+        return deleted
 
     def location_keyboard(self):
         markup = ReplyKeyboardMarkup(row_width=1, one_time_keyboard=True)
@@ -370,6 +440,11 @@ class Helper:
         date: datetime = None,
         dry_run: bool = True,
     ):
+        """! Sends the venue and the poll for a leistungstag
+
+        @returns On a dry run the id of the scratch file holding the
+                 preview, so the caller can clean it up. `None` otherwise.
+        """
         if not date:
             date = self.next_leistungstag()
         date_str = date.strftime(self.dateformat)
@@ -407,6 +482,10 @@ class Helper:
                 "Woin ma des so veröffentlichen?",
                 reply_markup=self.dry_run_button(rand_id),
             )
+            # handed back so the caller - which knows who pressed the
+            # button - can put it in their context and clean it up if the
+            # preview is rejected. See #97.
+            return rand_id
         else:
             self.db.addLeistungsTag(
                 date,
@@ -715,7 +794,8 @@ class PersistantLeistungsTagPoller:
         self.helper = helper
 
     def dry_send_with_date(self, date: datetime):
-        self.helper.send_leistungstag(
+        """! @returns The scratch file id behind the preview's buttons"""
+        return self.helper.send_leistungstag(
             self.chat_id,
             self.location,
             self.type,
@@ -724,7 +804,8 @@ class PersistantLeistungsTagPoller:
         )
 
     def dry_send(self):
-        self.helper.send_leistungstag(
+        """! @returns The scratch file id behind the preview's buttons"""
+        return self.helper.send_leistungstag(
             self.chat_id,
             self.location,
             self.type,

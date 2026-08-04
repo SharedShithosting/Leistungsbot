@@ -1,10 +1,114 @@
-[![Tests Status](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/integrationtests.yml/reports/junit/junit-badge.svg?dummy=8484744)](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/integrationtests.yml/reports/junit/report.html)
+# Leistungsbot
+
+[![unittests](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/unittests.yml/badge.svg)](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/unittests.yml)
+[![integrationtests](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/integrationtests.yml/badge.svg)](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/integrationtests.yml)
 [![Docker Image CI](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/docker-image.yml/badge.svg)](https://github.com/SharedShithosting/Leistungsbot/actions/workflows/docker-image.yml)
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/SharedShithosting/Leistungsbot/main.svg)](https://results.pre-commit.ci/latest/github/SharedShithosting/Leistungsbot/main)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
+A telegram bot that organises a *leistungstag*: one group chat, one pub, one
+poll asking who is coming. It looks the pub up on google places so nobody has
+to type an address, keeps the guest list in a database, and remembers where
+the group has already been so the next suggestion can be somewhere new.
 
-## Development database
+Written for one chat in particular, in dialect, and it shows.
+
+
+## What it does
+
+A leistungstag has a short life, and a command for every step of it:
+
+* an admin runs `/leistungspoll`, picks a location and a date. The bot
+  searches google places, shows what it found and asks for a yes before it
+  publishes anything.
+* the poll goes to the leistungschat, pinned, and the leistungstag is written
+  to the database with the location, the date and the poll it belongs to.
+* `/sendreminder` nudges the chat, `/switcheroo` moves the evening to another
+  pub, `/closepoll` ends it and `/purge` deletes it entirely.
+* afterwards `/rate_location` records what the pub was worth and `/history`
+  looks back at what has already happened.
+
+Three kinds of leistungstag exist - the normal one, the *konkurrenz* poll and
+the *zusatz* poll - which is what `/konkurrenzpoll` and `/zusatzpoll` create.
+
+Locations are a list of their own: `/add_location` puts a pub forward,
+`/show_locations` is everything nobody has been to yet, `/remove_location`
+takes one back off the list.
+
+A scheduler does the routine part without being asked - a reminder at noon,
+the reservation message on monday, closing the previous poll at seven, and a
+copy of the database to the backup chat on sunday morning.
+
+`/help` lists the commands the sender is actually allowed to run: public,
+admin of the leistungschat, or one of the `usernames` from the config.
+`leistungsbot/Commands.py` is where that list lives, and it is the same list
+telegram is given for its command menu.
+
+
+## Running it
+
+The container is the intended way. It needs a config file and a volume for
+the database:
+
+```bash
+cp BotConfig.example BotConfig.yml   # then fill it in, see below
+docker compose up -d
+```
+
+Or from PyPI, if you would rather run it next to something else:
+
+```bash
+pip install leistungsbot
+LEISTUNGSBOT_CONFIG_FILE=BotConfig.yml python -m leistungsbot
+```
+
+The same line works from a checkout. There is a `leistungsbot` console
+script as well, but it points at a `main` that `leistungsbot/__main__.py`
+does not export - use `python -m` until that is fixed.
+
+
+## Configuration
+
+`BotConfig.example` is a complete file with fake values in it. The keys that
+have to be set:
+
+| key | what it is |
+| --- | --- |
+| `bot_token` | the token [@BotFather](https://telegram.me/BotFather) gives you |
+| `api_hash`, `api_id` | from <https://my.telegram.org> |
+| `google` | a google places api key |
+| `leistungschat_id` | the chat the polls are published in |
+| `leistungsadmin_id` | the admin chat |
+| `chat_id` | where errors are reported |
+| `usernames` | who may run the maintenance commands |
+| `sqlite.path` | the database file, `/data/leistungs_db.sqlite` in the image |
+| `backupchat_id` | optional, where `/backup` sends the database |
+| `calendar` | optional, see below |
+
+Every key can also come from the environment, prefixed and with `__` for the
+nesting - `LEISTUNGSBOT_BOT_TOKEN`, `LEISTUNGSBOT_SQLITE__PATH`.
+`LEISTUNGSBOT_CONFIG_FILE` says which file to read; without it the config is
+looked for in the platform's usual place. A handful of the keys have command
+line flags as well, `python -m leistungsbot --help` lists them.
+
+
+## Development
+
+```bash
+poetry install --with=dev
+poetry run pytest
+poetry run pre-commit install
+```
+
+`tests/` is mocked end to end - no database, no google, no telegram - which
+is the suite `unittests.yml` runs on every pull request, on 3.11 and 3.14.
+`integrationtests.yml` is the one that talks to the real services, so it
+waits for an environment approval first. Both hold every file to 75%
+coverage rather than the project as a whole: `tools/check_coverage.py` is
+what fails a module that has no tests at all.
+
+
+### Development database
 
 The bot needs a database with something in it before most commands do
 anything interesting. `tools/seed_dev_db.py` builds one full of invented
@@ -70,59 +174,6 @@ a line in `from_config`.
 [service account]: https://cloud.google.com/iam/docs/service-account-overview
 
 
-## Intro
-  <body>This Is A Simple Bot To Create Poll In Channel and Groups <br> And Also This Is our First Project Too..
+## License
 
-
-## Enter you tokens at these are very important VARS:
-  Without fork you cant deploy so fork it and edit in [Bot.py#L22](https://github.com/BotsUniverse/poll-bot/blob/main/Bot.py#L22)
-
-## DEVLOPERS
-😎ROHITH [ROHITHADITYA](https://telegram.me/rohithaditya) <br> 😋PARVAT [PARVAT_R](https://telegram.me/Parvat_R)
-
-## QUICK NOTES
-**DONT FORGET TO JOIN [Venila Bots](https://telegram.me/venilabots)**
-
-## LANUGUAGES
-<br>
->> PY BOT API
-<br>
->> PYTHON
-
-## SUPPORT GROUP
-<a href="https://t.me/venilabots"><img src="https://img.shields.io/badge/Join-Telegram%20Channel-blue.svg?logo=telegram"></a><br>
-<a href="https://t.me/venilabots1"><img src="https://img.shields.io/badge/Join-Telegram%20Group-blue.svg?logo=telegram"></a><br>
-
-## SIMLIFIED READ ME HERE
-
-Read Me --> [SIMPLIFIED README](https://springreen.ga/pollbot-docs)<br>
-### DEPLOY
- ## DEPLOY TO HEROKU <br>
-[![Deploy](https://www.herokucdn.com/deploy/button.svg)](http://springreen.ga/pollbot-docs/#getting_started)
-
- ## RUN IN TERMUX
-```
-git clone https://github.com/Botsuniverse/poll-bot
-cd poll-bot
-python3 Bot.py
-```
-
- ## RUN IN PYDROID 3 <br>
-    (x) Just Copy The Bot.py to pydroid and Simply Run it
-
- ## RUN IN YOUR LINUX VPS OR DESKTOP
-
-```
-sudo apt update
-sudo apt upgrade
-git clone https://github.com/Botsuniverse/poll-bot
-python3 Bot.py
-```
-
- ## RUN THIS IN WINDOWS TERMINAL
-
-```bash
-git clone https://github.com/BotsUniverse/poll-bot/
-cd where_the_fuck_you_stored/poll-bot
-py Bot.py
-```
+Beerware, revision 42. See [LICENSE.md](LICENSE.md).

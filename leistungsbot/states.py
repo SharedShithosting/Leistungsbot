@@ -13,6 +13,7 @@ state without importing `Bot`, which imports them.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from dataclasses import field
 from typing import TYPE_CHECKING
 
 from telebot.handler_backends import State
@@ -57,3 +58,9 @@ class UserContext:
 
     poller: PersistantLeistungsTagPoller | None = None
     leistungstag: dict | None = None
+    #: Scratch file ids this user has open, see `Helper.store_to_rand_file`.
+    #: Only `load_from_rand_file` used to delete one, so a search nobody
+    #: approved and a preview somebody rejected stayed in the temp directory
+    #: for good. Tracking them here is what lets `process_cancel` clean up
+    #: after a workflow that was abandoned rather than finished (#97).
+    scratch_ids: set[int] = field(default_factory=set)

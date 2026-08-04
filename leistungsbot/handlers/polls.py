@@ -204,7 +204,7 @@ class PollHandlers:
         open_state = self.helper.check_open_hours(poller.location, date)
 
         if open_state[0] == Openness.OPEN:
-            poller.dry_send_with_date(date)
+            self.remember_scratch(call, poller.dry_send_with_date(date))
         else:
             poller.date = date
 
@@ -237,4 +237,7 @@ class PollHandlers:
 
     def process_check_open_hours(self, callback, open_hours_correct):
         if open_hours_correct:
-            self.context_of(callback).poller.dry_send()
+            self.remember_scratch(
+                callback,
+                self.context_of(callback).poller.dry_send(),
+            )

@@ -263,13 +263,26 @@ def callback_payloads(markup) -> list[dict[str, Any]]:
     return payloads
 
 
-def last_markup(app) -> Any:
-    """``reply_markup`` of the most recent outgoing message."""
+def last_markup_or_none(app) -> Any:
+    """``reply_markup`` of the most recent outgoing message, if there is one.
+
+    ``None`` is a real answer here: a prompt with nothing to offer should
+    send no keyboard rather than an empty one, which telegram rejects
+    outright (#15). Use :func:`last_markup` when a keyboard is the point of
+    the test and its absence is a failure.
+    """
     for _name, _args, kwargs in reversed(app.outbox):
         markup = kwargs.get("reply_markup")
         if markup is not None:
             return markup
-    raise AssertionError("no message with a reply_markup was sent")
+    return None
+
+
+def last_markup(app) -> Any:
+    """``reply_markup`` of the most recent outgoing message."""
+    markup = last_markup_or_none(app)
+    assert markup is not None, "no message with a reply_markup was sent"
+    return markup
 
 
 def state_of(app, user_id: int = ADMIN_USER_ID, chat_id: int = GROUP_CHAT_ID):

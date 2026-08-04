@@ -63,6 +63,27 @@ class CallbackHandlers:
         )
         return False
 
+    def unhandled_callback(self, call):
+        """! Reports a button press nothing else claimed
+
+        Registered last and without a filter, so it only sees what neither
+        the calendar nor `Helper.filter` took - callback data that is not
+        the bot's own `{"🍻cmd": value}` json.
+
+        Until #82 `callback_query` was that catch-all by accident: its
+        filter evaluated to `None` and telebot dropped it. Giving the filter
+        back its `return` would have made a foreign callback disappear
+        without a word, so the reporting moved here instead of going away.
+        """
+        try:
+            self.bot.answer_callback_query(call.id, "Copy that")
+            self.bot.send_message(
+                lc.config["chat_id"],
+                f"Hi Devs!!\nHandle this callback\n{call.data}",
+            )
+        except Exception as error:
+            self.helper.report_error(call.message, error)
+
     def callback_query(self, call):
         try:
             data = json.loads(call.data)
@@ -103,6 +124,8 @@ class CallbackHandlers:
                         )
                 else:
                     res = self.helper.add_location(val[0], val[1])
+                    # add_location consumed the scratch file
+                    self.forget_scratch(call, val[0])
                     if res == LeistungsReturnCodes.DB_DUPLICATE:
                         self.bot.send_message(
                             call.message.chat.id,
@@ -114,12 +137,14 @@ class CallbackHandlers:
                 self.process_cancel(call.message, call.from_user.id)
             elif cmd == "publish":
                 self.helper.publish_leistungstag(val)
+                # publish_leistungstag consumed the scratch file
+                self.forget_scratch(call, val)
                 self.bot.send_message(
                     call.message.chat.id,
                     "Hauma so veröffentlicht",
                 )
             elif cmd == "q":
-                self.process_search_location(call.message.chat.id, val)
+                self.process_search_location(call, call.message.chat.id, val)
             elif cmd == "history_type":
                 self.bot.send_message(
                     call.message.chat.id,
@@ -207,6 +232,16 @@ class CallbackHandlers:
                     self.process_generic_leistungsmessage(
                         call.message.reply_to_message,
                         val,
+                    )
+                else:
+                    # The keyboard says which poll, the state said what to
+                    # do with it - and since #17 a later command ends the
+                    # conversation, so the button can outlive its meaning.
+                    # Silence here looked like a broken button.
+                    self.bot.reply_to(
+                        call.message,
+                        "I waß nimma, wos i mit dem Poll soi. "
+                        "Fang nu amoi vo vorn au.",
                     )
             elif cmd == "closed":
                 self.bot.reply_to(

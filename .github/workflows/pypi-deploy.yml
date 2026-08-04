@@ -1,6 +1,10 @@
 name: deploy-to-pypi
+# `create` has no `tags` filter - the sub-key used to sit here and was
+# ignored, so every new branch started a build of an untagged commit and
+# PyPI rejected the local version poetry-dynamic-versioning stamps on it.
+# `push` is the event that actually supports the filter. See #79.
 on:
-  create:
+  push:
     tags:
       - v*
 jobs:
@@ -10,6 +14,16 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+      # A second lock, for a run started by hand or by a future trigger:
+      # off a tag the version is `1.2.3`, anywhere else it carries a
+      # `+<sha>` local part that PyPI refuses. Fail here rather than in
+      # the upload, where the error only says "local versions".
+      - name: Refuse to publish an untagged commit
+        run: |
+          if ! git describe --exact-match --match 'v*' HEAD; then
+            echo "HEAD is not a v* tag - nothing to publish." >&2
+            exit 1
+          fi
       - name: Build and publish to pypi
         uses: JRubics/poetry-publish@v1.16
         with:

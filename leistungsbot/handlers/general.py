@@ -17,9 +17,43 @@ from leistungsbot import _version
 from leistungsbot import leistungs_config as lc
 from leistungsbot.states import LeistungsState
 
+#: Every name telebot will match as a command, aliases included.
+KNOWN_COMMANDS = frozenset(
+    name for command in Commands.ALL for name in command.names
+)
+
 
 class GeneralHandlers:
     """The commands that are not about a leistungstag at all."""
+
+    def is_unknown_command(self, message) -> bool:
+        """! Whether `message` is a command nothing above this handles
+
+        Telebot has no such filter: a command handler matches its own
+        names and that is all, so anything starting with a slash that is
+        not in the registry fell through to whichever state handler was
+        listening and was read as an answer. A typo in the middle of
+        /add_location became a location name. See #17.
+        """
+        text = (message.text or "").strip()
+        if not text.startswith("/"):
+            return False
+        word = text.split(maxsplit=1)[0]
+        # telegram lets a command be addressed at a bot: /help@leistungsbot
+        return word[1:].split("@", 1)[0] not in KNOWN_COMMANDS
+
+    def unknown_command(self, message):
+        """! Answers a command that does not exist
+
+        Does not end the conversation. A mistyped command is the one case
+        where the sender clearly did not mean to start something new, and
+        dropping their half finished workflow over a typo would be worse
+        than the typo.
+        """
+        self.bot.reply_to(
+            message,
+            "So an Befehl hob i ned. Schau amoi in /help eine.",
+        )
 
     def help_command(self, message):
         try:
@@ -155,6 +189,11 @@ class GeneralHandlers:
         own account and clearing that state clears nothing - the button
         answered "Halt Stop." while leaving the presser exactly where they
         were. See #78.
+
+        Also throws away whatever the workflow had pickled. A scratch file
+        was only ever deleted by the button that consumed it, so cancelling
+        a search or rejecting a preview used to leave one behind for good
+        (#97).
         """
         self.bot.send_message(
             message.chat.id,
@@ -164,6 +203,7 @@ class GeneralHandlers:
         if user_id is None:
             user_id = message.from_user.id
         self.bot.delete_state(user_id, message.chat.id)
+        self.discard_scratch(user_id)
 
     def process_send_nudes(self, chat_id):
         self.helper.send_nude(chat_id)
