@@ -1,0 +1,39 @@
+# The pages site is built from the repository root, so whatever sits in the
+# working directory is served from
+# <https://sharedshithosting.github.io/Leistungsbot/>. Without this file that
+# was the entire tree - `leistungsbot/Bot.py`, `poetry.lock` and
+# `tests/conftest.py` all answered 200. Nothing secret is in the repository
+# and the source is on github anyway, but the site is meant to be the README
+# and the reports, not a second file browser.
+#
+# `exclude` replaces jekyll's default rather than adding to it, which is why
+# the vendor entries it ships with are repeated at the bottom.
+title: Leistungsbot
+description: Bot support for the Leistungstag
+# What the site already used: `actions/jekyll-build-pages` falls back to
+# primer when nothing is configured. Named here so it cannot change under us.
+theme: jekyll-theme-primer
+exclude:
+  # the venv, if a workflow ever builds one in the checkout
+  - .venv/
+  # the code and everything that builds or tests it
+  - leistungsbot/
+  - tests/
+  - tools/
+  - dist/
+  - example_db/
+  - Dockerfile
+  - docker-compose.yml
+  - poetry.lock
+  - pyproject.toml
+  # config templates: harmless, but they read as if they were live config
+  - BotConfig.example
+  - config_default.yaml
+  # jekyll's own defaults, lost by setting this key at all
+  - .sass-cache/
+  - .jekyll-cache/
+  - gemfiles/
+  - Gemfile
+  - Gemfile.lock
+  - node_modules/
+  - vendor/
