@@ -46,10 +46,14 @@ def test_the_callback_filter_rejects_foreign_callbacks(app):
 
 
 # --- #15 sendreminder / closepoll with no open poll --------------------
+#
+# Fixed. `sneaky_closepoll` is in the list because it asked the same
+# question through the same empty keyboard, it was just never reported.
+
+NEEDS_AN_OPEN_POLL = ["/sendreminder", "/closepoll", "/sneaky_closepoll"]
 
 
-@open_bug(15, "an empty keyboard is sent instead of saying there is none")
-@pytest.mark.parametrize("command", ["/sendreminder", "/closepoll"])
+@pytest.mark.parametrize("command", NEEDS_AN_OPEN_POLL)
 def test_no_open_poll_is_said_out_loud(app, db, command):
     db.getOpenLeistungsTag.return_value = []
 
@@ -60,16 +64,35 @@ def test_no_open_poll_is_said_out_loud(app, db, command):
     assert any(word in said for word in ("kan", "kein", "ka ", "nix"))
 
 
-@open_bug(15, "telegram rejects a reply_markup with zero buttons")
-@pytest.mark.parametrize("command", ["/sendreminder", "/closepoll"])
+@pytest.mark.parametrize("command", NEEDS_AN_OPEN_POLL)
 def test_no_open_poll_sends_no_empty_keyboard(app, db, command):
     db.getOpenLeistungsTag.return_value = []
 
     support.send_command(app, command)
 
-    markup = support.last_markup(app)
+    markup = support.last_markup_or_none(app)
     if markup is not None:
         assert support.button_labels(markup), "sent an empty keyboard"
+
+
+@pytest.mark.parametrize("command", NEEDS_AN_OPEN_POLL)
+def test_no_open_poll_ends_the_conversation(app, db, command):
+    """Nothing can answer the question, so leaving the state set would
+    strand the next message in a handler waiting for a button press."""
+    db.getOpenLeistungsTag.return_value = []
+
+    support.send_command(app, command)
+
+    assert support.state_of(app) is None
+
+
+@pytest.mark.parametrize("command", NEEDS_AN_OPEN_POLL)
+def test_no_open_poll_is_not_an_error(app, db, command):
+    db.getOpenLeistungsTag.return_value = []
+
+    support.send_command(app, command)
+
+    support.assert_no_dev_error(app)
 
 
 # --- #17 commands are swallowed while in a conversation ----------------

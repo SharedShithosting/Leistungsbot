@@ -17,9 +17,45 @@ from leistungsbot import assets
 from leistungsbot import leistungs_config as lc
 from leistungsbot.states import LeistungsState
 
+#: Asked from three places in `send_reminder` - straight away, after a date
+#: that is not one, and after a date with no leistungstag on it.
+REMIND_QUESTION = "An welchen Poll wüst reminden?"
+
 
 class PollLifecycleHandlers:
     """What happens to a leistungstag after it has been published."""
+
+    #: What to say when there is nothing to remind about or close.
+    #:
+    #: This used to be an empty keyboard: `open_polls_button` builds one
+    #: button per open leistungstag, and telegram rejects a `reply_markup`
+    #: with zero of them - so /sendreminder and /closepoll did not merely
+    #: look unhelpful, they reported an api error. See #15.
+    NO_OPEN_POLL = (
+        "Do gibts kan offenen Poll. Mach zerst amoi an mit /leistungspoll."
+    )
+
+    def ask_which_poll(self, message, question: str) -> bool:
+        """! Asks which of the open polls to act on
+
+        @param message What to reply to
+        @param question What to put above the keyboard
+
+        @returns Whether there was anything to ask about. When there is no
+                 open poll this says so, ends the conversation and returns
+                 False - the caller is done.
+        """
+        leistungstage = self.helper.db.getOpenLeistungsTag()
+        if not leistungstage:
+            self.bot.reply_to(message, self.NO_OPEN_POLL)
+            self.bot.delete_state(message.from_user.id, message.chat.id)
+            return False
+        self.bot.reply_to(
+            message,
+            question,
+            reply_markup=self.helper.polls_button(leistungstage),
+        )
+        return True
 
     def send_reminder(self, message: telebot.types.Message):
         try:
@@ -40,11 +76,7 @@ class PollLifecycleHandlers:
             command_parts = message.text.strip().split()
 
             if len(command_parts) == 1:
-                self.bot.reply_to(
-                    message,
-                    "An welchen Poll wüst reminden?",
-                    reply_markup=self.helper.open_polls_button(),
-                )
+                self.ask_which_poll(message, REMIND_QUESTION)
                 return
             else:
                 target_date_str = command_parts[1]
@@ -57,11 +89,7 @@ class PollLifecycleHandlers:
                         message.chat.id,
                         f"Soi des a Datum sei? Schick ma wonn donn sowos wie {datetime.now().date().isoformat()}",
                     )
-                    self.bot.reply_to(
-                        message,
-                        "An welchen Poll wüst reminden?",
-                        reply_markup=self.helper.open_polls_button(),
-                    )
+                    self.ask_which_poll(message, REMIND_QUESTION)
 
                 # print(f'Date: {target_date}')
 
@@ -73,11 +101,7 @@ class PollLifecycleHandlers:
                         )
                     )
                     if not successful:
-                        self.bot.reply_to(
-                            message,
-                            "An welchen Poll wüst reminden?",
-                            reply_markup=self.helper.open_polls_button(),
-                        )
+                        self.ask_which_poll(message, REMIND_QUESTION)
 
         except Exception as error:
             self.bot.delete_state(message.from_user.id, message.chat.id)
@@ -98,11 +122,7 @@ class PollLifecycleHandlers:
                 LeistungsState.closePoll,
                 message.chat.id,
             )
-            self.bot.reply_to(
-                message,
-                "Welchen Poll wüst closen?",
-                reply_markup=self.helper.open_polls_button(),
-            )
+            self.ask_which_poll(message, "Welchen Poll wüst closen?")
         except Exception as error:
             self.helper.report_error(message, error)
 
@@ -120,11 +140,7 @@ class PollLifecycleHandlers:
                 LeistungsState.sneakyClosePoll,
                 message.chat.id,
             )
-            self.bot.reply_to(
-                message,
-                "Welchen Poll wüst sneaky closen?",
-                reply_markup=self.helper.open_polls_button(),
-            )
+            self.ask_which_poll(message, "Welchen Poll wüst sneaky closen?")
         except Exception as error:
             self.helper.report_error(message, error)
 
