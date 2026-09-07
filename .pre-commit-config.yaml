@@ -29,7 +29,7 @@ repos:
   # pyproject.toml under [tool.ruff]; its isort agrees with black by design,
   # which is what the three hooks it replaced did not.
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.1
+    rev: v0.16.6
     hooks:
       - id: ruff-check
         args: [--fix]
